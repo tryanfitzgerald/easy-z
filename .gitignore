@@ -1,0 +1,16 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Lock files
+data/.~lock.*
+
+# Python
+__pycache__/
+*.pyc
+
+# Reports (generated weekly)
+reports/*.md
+
+# Node
+node_modules/
