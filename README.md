@@ -1,394 +1,131 @@
-# Carwash Siting Heat Map
-## Illinois & Wisconsin Municipal Friendliness Analysis
+# EASY Z — Nationwide Municipal Zoning Friction Map
 
-**Project:** Shorewood Development Group  
-**Purpose:** Identify municipalities most likely to approve carwash, drive-thru coffee, and similar quick-service retail uses in IL and WI  
-**Timeline:** 30 days to interactive map  
-**Status:** Initial build phase (Week 1-2: Data acquisition & validation)
+**Shorewood Development Group**
+Live: [tryanfitzgerald.github.io/easy-z](https://tryanfitzgerald.github.io/easy-z)
+Repo: [github.com/tryanfitzgerald/easy-z](https://github.com/tryanfitzgerald/easy-z)
 
 ---
 
-## Overview
+## What It Does
 
-The Carwash Siting Heat Map identifies which Illinois and Wisconsin municipalities are:
-- **Friendly**: Green-light zoning for carwash/drive-thru retail; recent approvals
-- **Neutral**: Possible via conditional use; approval depends on site-specific factors
-- **NIMBY**: High opposition; recommend NIMBY-adjacent border properties instead
+Easy Z is an interactive map that scores every incorporated municipality in the United States on how easy or hard it is to get zoning approval for four commercial use types:
 
-### Data Sources
-1. **Municipal Zoning Ordinances** (primary) — extracted via Claude Vision from PDF ordinances
-2. **Approval History** (calibration) — news articles, council meeting minutes, permit records
-3. **NIMBY Sentiment** (risk scoring) — opposition language from public records
+- **Car Wash** — express tunnel, flex-serve, self-serve
+- **Drive-Thru** — coffee (Starbucks, Dutch Bros, Dunkin, Seven Brews), QSR
+- **Collision Repair** — auto body, paint shops
+- **Auto Sales/Service/Delivery** — dealerships, service centers
 
-### Output
-- **Interactive Map** (Leaflet.js): Click any municipality to see scores, approval history, recommendations
-- **Heat Map Data** (JSON): Machine-readable scores for integration into deal sourcing workflows
-- **Saturation Analysis**: Identifies underserved friendly municipalities
-- **NIMBY-Adjacent Opportunities**: Border properties near restrictive towns (high-ROI targets)
+Each municipality gets a **friction score from 0–100** based on five institutional-grade factors: Zoning permissiveness, Process complexity, Site requirements, Competition saturation, and Political risk.
+
+---
+
+## Key Features
+
+**Scoring Engine**
+- Friction-adjusted 5-factor model inspired by institutional underwriting (Zoning, Process, Site, Competition, Political — each 0–20)
+- 88 ground-truth researched municipalities (IL, IN, WI) with real ordinance data
+- Auto-estimation engine for all ~19,500 US incorporated places using population, state friction, and affluence signals
+- Color scale: Green (80+) → Light green (65–79) → Yellow (50–64) → Orange (30–49) → Red (<30)
+
+**Interactive Map**
+- Leaflet.js with Canvas renderer for nationwide polygon performance
+- US Census TIGERweb API for municipal boundaries (loaded in parallel, 5 states at a time)
+- Click any municipality for detailed popup: score breakdown, approval pathway, zone districts, special use permit status, site requirements, stacking minimums
+- Three basemap options: Dark, Streets, Satellite
+- Address geocoding search (Nominatim/OpenStreetMap)
+- Municipality name search with score preview
+
+**Competitor Overlay**
+- Toggle to show existing businesses from OpenStreetMap (Overpass API)
+- Auto-reloads on pan/zoom (debounced, zoom 8+ required)
+- Drive-thru layer is brand-colored: Starbucks (green), Dutch Bros (blue), Dunkin (orange), Seven Brews (burgundy), others (gray)
+- Hover for name + address, click for full detail card with phone/website
+
+**Zoning Intel**
+- Live news feed in every municipality popup (Google News RSS)
+- Dual search: zoning news + city council minutes/agendas
+- Quick-link buttons: News, Council Minutes, Ordinances
+- Weekly automated ordinance monitoring (scheduled task, runs Mondays 8am)
 
 ---
 
 ## Project Structure
 
 ```
-carwash-heat-map/
+Easy Z/
+├── index.html                          # Interactive map (main deliverable, self-contained)
 ├── data/
-│   └── target_municipalities.json          # 98 IL/WI municipalities (Cook, DuPage, Lake, Will, Dane, Milwaukee, Brown counties)
+│   ├── zoning_data.json                # 88 researched municipalities with per-use scoring
+│   ├── easy_z_research_workbook.xlsx   # 6-sheet team research workbook
+│   └── content_hashes.json             # Data integrity checksums
 ├── scripts/
-│   ├── 00_orchestrator.py                  # Master pipeline orchestrator
-│   ├── 01_fetch_ordinances.py              # Download zoning ordinances from municipal websites
-│   ├── 02_parse_ordinances.py              # Claude Vision: extract carwash/drive-thru rules from PDFs
-│   ├── 03_scrape_approval_news.py          # Search for approval/denial history and NIMBY sentiment
-│   └── 04_scoring_engine.py                # Calculate friendliness scores, synthesize heat map
-├── output/
-│   ├── index.html                          # Interactive Leaflet.js map (PRODUCTION DELIVERABLE)
-│   ├── heat_map_scores.json                # Complete heat map data (all municipalities with scores)
-│   ├── ordinance_extractions.json          # Parsed ordinance rules by municipality
-│   ├── approval_data.json                  # Approval/denial history and sentiment
-│   └── pipeline_results.json               # Pipeline execution log
-├── logs/
-│   ├── ordinance_fetch.log                 # Ordinance fetch attempts
-│   ├── ordinance_parser.log                # Claude Vision parsing log
-│   ├── news_scraper.log                    # Approval data search log
-│   ├── scoring_engine.log                  # Scoring & synthesis log
-│   └── orchestrator.log                    # Master pipeline log
-└── README.md                               # This file
+│   ├── build_zoning_data_v5.py         # Current data builder (friction-adjusted 5-factor model)
+│   ├── build_html_map.py               # HTML assembler (injects JSON data into map template)
+│   ├── xlsx_to_json.py                 # Workbook-to-JSON pipeline
+│   ├── weekly_refresh.py               # Automated data refresh script
+│   └── build_zoning_data_v[1-4].py     # Previous model iterations (archived)
+├── docs/
+│   ├── EASY_Z_PROGRAM_ROADMAP.md       # Strategic roadmap and punchlist
+│   └── RESEARCH_GUIDE.md               # Team guide for adding new municipalities
+├── reports/                            # Weekly ordinance monitoring reports (auto-generated)
+└── logs/                               # Refresh and pipeline logs
 ```
 
 ---
 
-## Quick Start
+## How to Add a Municipality
 
-### Prerequisites
-- Python 3.9+
-- Anthropic API key (Claude Opus 4.6 for Vision, Claude 3.5 Sonnet for web search)
-- ~100MB free disk space for ordinance PDFs
-- Curl or wget (for ordinance downloads)
+1. Open `data/easy_z_research_workbook.xlsx`
+2. Fill in the municipality row: zoning districts, approval pathway, special use requirements, stacking, site requirements
+3. Run `python3 scripts/build_zoning_data_v5.py` to regenerate `zoning_data.json`
+4. Run `python3 scripts/build_html_map.py` to rebuild the map
+5. See `docs/RESEARCH_GUIDE.md` for detailed field definitions
 
-### Installation
+---
+
+## Tech Stack
+
+- **Frontend:** Leaflet.js, vanilla JS, CSS — single self-contained HTML file (~140KB)
+- **Data:** US Census TIGERweb ArcGIS REST API (boundaries), OpenStreetMap Overpass API (competitors), Nominatim (geocoding), Google News RSS (intel)
+- **Build tools:** Python 3 (data pipeline), Node.js (syntax validation)
+- **Hosting:** GitHub Pages (static, free)
+- **Monitoring:** Weekly scheduled task via Claude (ordinance change detection)
+
+No API keys required. Everything uses free public APIs.
+
+---
+
+## Deployment
+
+The map is deployed via GitHub Pages. To update:
 
 ```bash
-cd /home/claude/carwash-heat-map
-
-# Create virtual environment (optional but recommended)
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install anthropic requests
+# After making changes to data or code:
+python3 scripts/build_zoning_data_v5.py    # Rebuild scoring data
+python3 scripts/build_html_map.py          # Rebuild HTML map
+git add -A && git commit -m "Update"
+git push
 ```
 
-### Running the Pipeline
-
-**Option 1: Full automatic pipeline (recommended)**
-```bash
-cd /home/claude/carwash-heat-map
-python3 scripts/00_orchestrator.py
-```
-
-**Option 2: Run individual steps**
-```bash
-# Step 1: Fetch ordinances (3-5 hours)
-python3 scripts/01_fetch_ordinances.py
-
-# Step 2: Parse with Claude Vision (2-3 hours)
-python3 scripts/02_parse_ordinances.py
-
-# Step 3: Scrape approval/news data (4-6 hours)
-python3 scripts/03_scrape_approval_news.py
-
-# Step 4: Calculate scores (30 min)
-python3 scripts/04_scoring_engine.py
-```
-
-**Option 3: Quick validation run (testing)**
-```bash
-# Modify target_municipalities.json to include only 5 municipalities
-# Then run orchestrator.py
-# Expected time: 2-3 hours
-```
+Changes go live within ~60 seconds of pushing.
 
 ---
 
-## Pipeline Stages
+## Scoring Methodology
 
-### Stage 1: Ordinance Fetching (Days 1-3)
-**Script:** `01_fetch_ordinances.py`  
-**Input:** `target_municipalities.json` (98 municipalities)  
-**Output:** `ordinance_fetch_results.json` (URLs to downloaded ordinances)
+Each municipality is scored on five factors (0–20 each, summed to 0–100):
 
-- Searches each municipality's website for zoning ordinance PDFs
-- Tries 9 common URL patterns per municipality
-- Logs success/failure for each attempt
-- Expected success rate: 70-85% (some municipalities don't post digitized ordinances)
+| Factor | What It Measures |
+|---|---|
+| **Zoning** | Is the use permitted by right, conditional, special use, or prohibited? |
+| **Process** | How long and complex is the approval process? Public hearings, plan commission, board votes? |
+| **Site** | Lot size minimums, setbacks, stacking requirements, landscaping, screening? |
+| **Competition** | Market saturation — how many existing competitors per capita? |
+| **Political** | Council disposition, NIMBY risk, recent denials, moratoriums? |
 
-```bash
-# Run:
-python3 scripts/01_fetch_ordinances.py
-
-# Logs:
-tail -f logs/ordinance_fetch.log
-```
-
-### Stage 2: Ordinance Parsing (Days 4-6)
-**Script:** `02_parse_ordinances.py`  
-**Input:** Downloaded ordinance PDFs (from Stage 1)  
-**Output:** `ordinance_extractions.json` (structured carwash/drive-thru rules)
-
-Uses Claude Vision API to extract:
-- **Carwash zoning status**: Permitted by-right? Conditional use? Prohibited?
-- **Drive-thru rules**: Stacking limits, distance requirements, hours restrictions
-- **Parking requirements**: Carwash-specific minimums
-- **Dimensional standards**: Setbacks, lot coverage, canopy height limits
-- **Operational conditions**: Screening, noise limits, other restrictions
-
-Each ordinance processed independently. Claude Vision handles scanned PDFs gracefully.
-
-```bash
-# Run (requires valid ordinance PDFs from Stage 1):
-python3 scripts/02_parse_ordinances.py
-
-# Check progress:
-tail -f logs/ordinance_parser.log
-```
-
-### Stage 3: Approval Data Scraping (Days 5-10)
-**Script:** `03_scrape_approval_news.py`  
-**Input:** `target_municipalities.json` (municipality names for search queries)  
-**Output:** `approval_data.json` (recent approvals, denials, NIMBY sentiment)
-
-Uses Claude + web search to find:
-- Recent carwash/drive-thru approvals and denials (last 2-3 years)
-- NIMBY sentiment (extracted from news article language, council comments)
-- Approval timelines (how long did the process take?)
-- Key conditions imposed
-- Opposition organizations/quotes
-
-Searches for: `"{municipality} carwash OR drive-thru OR Dutch Bros OR Seven Brews approval OR denial OR permit"`
-
-```bash
-# Run:
-python3 scripts/03_scrape_approval_news.py
-
-# Observe progress:
-tail -f logs/news_scraper.log
-```
-
-### Stage 4: Scoring & Heat Map Generation (Days 21-30)
-**Script:** `04_scoring_engine.py`  
-**Input:** `ordinance_extractions.json` + `approval_data.json`  
-**Output:** `heat_map_scores.json` (all municipalities with scores)
-
-Calculates **Friendliness Score** (0-100) as weighted average:
-- **Ordinance score** (40%): Based on zoning rules
-- **Approval history score** (40%): % of applications approved vs. denied
-- **NIMBY sentiment score** (20%): Inverse of opposition strength
-
-**Output categories:**
-- **FRIENDLY** (67-100): Green-light sourcing
-- **NEUTRAL** (34-66): Conditional use pathway possible
-- **NIMBY** (0-33): High opposition risk; consider border properties
-
-For each municipality, produces:
-- Friendliness score + breakdown
-- Category (FRIENDLY/NEUTRAL/NIMBY)
-- Approval history (# approvals, denials, rate)
-- NIMBY sentiment classification
-- Sourcing recommendations
-
-```bash
-# Run (requires ordinance + approval data):
-python3 scripts/04_scoring_engine.py
-
-# Check results:
-cat output/heat_map_scores.json | jq '.municipalities[0:5]'
-```
+Friction adjustments are applied based on population (bigger = more friction), state regulatory environment (CA highest, TX/IN lowest), and affluence (wealthy suburbs get political penalty).
 
 ---
 
-## Interactive Map
-
-**File:** `output/index.html`  
-**Technology:** Leaflet.js + OpenStreetMap + vanilla JavaScript
-
-### Features
-- **Color-coded municipalities**: Green (Friendly) → Yellow (Neutral) → Red (NIMBY)
-- **Click for details**: Popup shows:
-  - Friendliness score
-  - Approval history (# approvals/denials)
-  - NIMBY sentiment
-  - Component scores (ordinance, approval history, sentiment)
-- **Sidebar rankings**: Top 5 friendly municipalities
-- **Filter toggles**: Show/hide Friendly, Neutral, or NIMBY municipalities
-- **Live statistics**: Count of each category
-- **Responsive design**: Works on desktop, tablet, mobile
-
-### Deployment
-```bash
-# Option 1: Serve locally
-cd /home/claude/carwash-heat-map/output
-python3 -m http.server 8000
-# Open: http://localhost:8000/index.html
-
-# Option 2: Deploy to web server
-scp output/index.html output/heat_map_scores.json user@server:/var/www/html/carwash-map/
-
-# Option 3: Stand-alone (update data path in index.html)
-# Modify line: fetch('./heat_map_scores.json') 
-# To: fetch('https://your-domain.com/heat_map_scores.json')
-```
-
-### Customizing the Map
-Edit `output/index.html`:
-- **Colors**: Modify `.color-friendly`, `.color-neutral`, `.color-nimby` CSS
-- **Branding**: Update title, header, logo
-- **Data source**: Change `fetch('./heat_map_scores.json')` to your data URL
-- **Sidebar content**: Add/remove sections as needed
-
----
-
-## Key Insights & Recommendations
-
-### Non-Obvious Opportunities
-1. **NIMBY-Adjacent Border Properties**: Properties just outside NIMBY municipalities but in friendly zoning capture spill-over demand without NIMBY opposition. These are often 40% higher ROI.
-2. **Underserved Friendly Towns**: Some friendly municipalities have zero carwashes (low saturation). These are your highest-priority sourcing targets.
-3. **Time-to-Approval as Deal Signal**: A "NIMBY" town with a 6-week approval timeline beats a "Friendly" town with an 18-month timeline in deal underwriting.
-4. **Approval Sentiment ≠ Approval Rate**: Some towns approve applications despite council opposition. Council sentiment ≠ final decision.
-
-### Sourcing Strategy
-**Tier 1 Targets** (Immediate sourcing):
-- Friendly municipalities with 0 existing carwashes
-- Low NIMBY sentiment, <8 week approval timelines
-
-**Tier 2 Targets** (Secondary):
-- Neutral municipalities with recent conditional-use approvals
-- Border properties adjacent to NIMBY towns
-
-**Tier 3 Targets** (Avoid):
-- NIMBY municipalities with 0 recent approvals
-- High organized opposition (e.g., neighborhood associations)
-
----
-
-## Integration with DDP (Long-term)
-
-This module is designed to integrate into Shorewood's Due Diligence Platform (DDP) as **Phase 2.5: Carwash Siting Intelligence**.
-
-### Future Integration Points
-1. **Phase 2 (Public Records)**: Auto-detect carwash zoning on every property analysis
-2. **Phase 4 (Municipal Intelligence)**: Feed approval probability score
-3. **Phase 7 (Cross-Document Synthesis)**: Include site comparability analysis (other carwashes in the municipality)
-4. **Phase 9 (Learning System)**: Feedback loop: as you close deals, system learns which friendly municipalities deliver fastest approval timelines
-
-### DDP Module Spec
-```python
-# In DDP's Phase 2, after geocoding:
-from carwash_module import get_municipality_friendliness
-
-result = get_municipality_friendliness(lat=41.88, lng=-87.62)
-# Returns:
-# {
-#   'municipality': 'Chicago',
-#   'state': 'IL',
-#   'friendliness_score': 45,
-#   'category': 'NEUTRAL',
-#   'approval_rate': 40,
-#   'nimby_sentiment': 'MEDIUM',
-#   'recommendations': [...]
-# }
-```
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**1. "Could not read PDF" errors in parsing**
-- Cause: Ordinance fetch failed for that municipality
-- Solution: Run Stage 1 (fetch) again, or manually verify ordinance URL in `ordinance_fetch_results.json`
-
-**2. "Invalid JSON in response" from Claude Vision**
-- Cause: PDF is image-only (OCR required) or ordinance is too long
-- Solution: Pre-process PDFs to extract text before sending to Claude; split large PDFs into sections
-
-**3. No approval data found for a municipality**
-- Cause: News search returned no results (maybe truly no recent projects)
-- Solution: Manual verification recommended; consider calling municipal planning department
-
-**4. Scoring seems off (friendly town marked NIMBY)**
-- Cause: Likely ordinance extraction captured prohibitive language out of context
-- Solution: Review `ordinance_extractions.json` and `approval_data.json` for that municipality; manually adjust score if needed
-
-**5. Map won't load data**
-- Cause: `heat_map_scores.json` not found or malformed
-- Solution: Verify `04_scoring_engine.py` completed successfully; check `output/` directory
-
----
-
-## Performance & Timeline
-
-| Stage | Input Size | Processing Time | Output Size | Success Rate |
-|-------|-----------|-----------------|-------------|--------------|
-| 1. Fetch Ordinances | 98 municipalities | 3-5 hrs | 70-85 PDFs (50-100MB) | 70-85% |
-| 2. Parse Ordinances | 70-85 PDFs | 2-3 hrs | ~500KB JSON | 95%+ |
-| 3. Approval Scraping | 98 municipalities | 4-6 hrs | ~200KB JSON | 100% |
-| 4. Scoring | Extractions + approvals | 30 min | ~100KB JSON | 100% |
-| **Total Pipeline** | — | **10-15 hours** | **~50MB** | — |
-
-**Parallel Processing Opportunity:** Stages 2-3 can run in parallel (while PDFs are downloading in Stage 1). With parallelization, total time reduces to **6-8 hours**.
-
----
-
-## Cost Estimate
-
-| Item | Quantity | Cost |
-|------|----------|------|
-| Claude Vision API calls (ordinance parsing) | ~75 ordinances × 1 call each | ~$1.00 |
-| Claude + web search (approval scraping) | ~100 municipalities × 1 call each | ~$0.50 |
-| Leaflet.js map (free) | 1 map | $0 |
-| Hosting (optional) | 1 map (~2MB) | $0-2/month |
-| **Total (one-time)** | — | **~$2** |
-| **Weekly updates** | Re-run scraper + scoring | **~$1/week** |
-
----
-
-## Next Steps
-
-### Week 1 (Immediate)
-1. ✅ Verify target municipalities list (98 IL/WI)
-2. ✅ Run ordinance fetch (Stage 1) on sample of 10 municipalities to validate URL patterns
-3. ✅ If >70% success, proceed to full fetch
-4. ⏳ Start ordinance parsing (Stage 2) in parallel
-
-### Week 2
-5. ⏳ Complete approval data scraping (Stage 3)
-6. ⏳ Run scoring engine (Stage 4)
-7. ⏳ Validate heat map against known projects
-8. ⏳ Deploy interactive map to web
-
-### Week 3-4
-9. ⏳ Use heat map for deal sourcing
-10. ⏳ Identify top 5-10 Friendly + Underserved municipalities for targeting
-11. ⏳ Scout 2-3 test properties in Friendly municipalities
-12. ⏳ Collect outcome feedback (approval timeline, conditions, etc.)
-
-### Post-30 Days
-13. ⏳ Integrate into DDP as Phase 2.5
-14. ⏳ Build feedback loop: capture actual deal outcomes, correlate with heat map predictions
-15. ⏳ Expand to additional states (MN, WI expansion, IN, MI)
-
----
-
-## Contact & Support
-
-**Questions?** Contact Shorewood Development Group  
-**Data issues?** Check logs in `/logs/` directory  
-**Map customization?** Edit `output/index.html`  
-**Pipeline enhancement?** Discuss with engineering team
-
----
-
-**Last Updated:** 2026.03.14  
-**Pipeline Status:** Initial build phase  
-**Confidence Level:** VALIDATED (sample testing complete)
+**Built by Shorewood Development Group**
+**Last updated:** March 2026
