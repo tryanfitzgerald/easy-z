@@ -63,14 +63,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .toggle-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left 0.2s; }
 .toggle-switch.active::after { left: 23px; }
 
-/* Loading overlay */
-#loading { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #1a1a2e; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-#loading h2 { color: #e94560; font-size: 24px; margin-bottom: 12px; }
-#loading p { color: #8899aa; font-size: 14px; margin-bottom: 20px; }
-#loading .progress-bar { width: 300px; height: 6px; background: #2a3a5e; border-radius: 3px; overflow: hidden; }
-#loading .progress-fill { height: 100%; background: #e94560; border-radius: 3px; transition: width 0.3s; width: 0%; }
-#loading .status-text { color: #6688aa; font-size: 12px; margin-top: 12px; }
-#loading.hidden { display: none; }
+/* Loading badge (corner overlay — map visible behind it) */
+#loading-badge { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 9999; background: #16213eee; border: 1px solid #2a4a6e; border-radius: 12px; padding: 10px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); transition: opacity 0.5s, transform 0.5s; }
+#loading-badge.hidden { opacity: 0; transform: translateX(-50%) translateY(20px); pointer-events: none; }
+#loading-badge .spinner { width: 16px; height: 16px; border: 2px solid #2a4a6e; border-top-color: #e94560; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading-badge .load-text { color: #cdd; font-size: 12px; white-space: nowrap; }
+#loading-badge .load-bar { width: 80px; height: 4px; background: #2a3a5e; border-radius: 2px; overflow: hidden; }
+#loading-badge .load-bar-fill { height: 100%; background: #e94560; border-radius: 2px; transition: width 0.3s; width: 0%; }
+
+/* Splash overlay (brief, fades out once map + first batch ready) */
+#splash { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #1a1a2e; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.6s; }
+#splash.fade-out { opacity: 0; pointer-events: none; }
+#splash.hidden { display: none; }
 
 /* Map */
 #map { flex: 1; background: #0a0a1a; }
@@ -97,7 +102,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </head>
 <body>
 
-<div id="loading">
+<!-- Brief splash — fades out once first batch renders -->
+<div id="splash">
   <div style="margin-bottom:12px;">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="72" height="72">
       <ellipse cx="32" cy="36" rx="16" ry="18" fill="#c8956c"/>
@@ -110,8 +116,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <line x1="30" y1="34" x2="34" y2="34" stroke="#333" stroke-width="1.2"/>
       <line x1="18" y1="33" x2="14" y2="31" stroke="#333" stroke-width="1"/>
       <line x1="46" y1="33" x2="50" y2="31" stroke="#333" stroke-width="1"/>
-      <line x1="21" y1="32" x2="23" y2="32" stroke="#555" stroke-width="0.6" stroke-linecap="round"/>
-      <line x1="37" y1="32" x2="39" y2="32" stroke="#555" stroke-width="0.6" stroke-linecap="round"/>
       <ellipse cx="15.5" cy="36" rx="2.5" ry="4" fill="#c8956c"/>
       <ellipse cx="48.5" cy="36" rx="2.5" ry="4" fill="#c8956c"/>
       <path d="M10 30 L54 30 Q56 30 55 28 L52 26 L10 26 Q8 26 9 28Z" fill="#111"/>
@@ -123,9 +127,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </svg>
   </div>
   <h2 style="color:#e94560;letter-spacing:2px;">EASY Z</h2>
-  <p>Loading municipal boundary data...</p>
-  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-  <div class="status-text" id="loading-status">Connecting to Census Bureau...</div>
+  <p style="color:#8899aa;font-size:14px;">Connecting to Census Bureau...</p>
+</div>
+
+<!-- Corner loading badge — stays while states load progressively -->
+<div id="loading-badge" class="hidden">
+  <div class="spinner"></div>
+  <span class="load-text" id="load-text">Loading states...</span>
+  <div class="load-bar"><div class="load-bar-fill" id="load-bar-fill"></div></div>
 </div>
 
 <div id="sidebar">
@@ -930,26 +939,24 @@ async function fetchStatePlaces(fips, abbr) {
   return features;
 }
 
-async function loadAllBoundaries() {
-  const progressFill = document.getElementById('progress-fill');
-  const statusText = document.getElementById('loading-status');
-  const loadedFeatures = [];
+async function loadAllBoundariesProgressive() {
+  const badge = document.getElementById('loading-badge');
+  const loadText = document.getElementById('load-text');
+  const barFill = document.getElementById('load-bar-fill');
+  const splash = document.getElementById('splash');
 
   // Try each endpoint until one works for the first state
   let endpointWorked = false;
   for (let ep = 0; ep < TIGER_ENDPOINTS.length && !endpointWorked; ep++) {
     TIGER_BASE = TIGER_ENDPOINTS[ep];
     console.log(`[EasyZ] Trying endpoint ${ep + 1}/${TIGER_ENDPOINTS.length}: ${TIGER_BASE.substring(0, 80)}...`);
-    statusText.textContent = `Connecting to Census API (attempt ${ep + 1})...`;
 
     try {
       const testFeatures = await fetchStatePlaces(STATES[0].fips, STATES[0].abbr);
       if (testFeatures.length > 0) {
         console.log(`[EasyZ] Endpoint ${ep + 1} works! Got ${testFeatures.length} features for ${STATES[0].name}`);
-        loadedFeatures.push(...testFeatures);
+        allFeatures.push(...testFeatures);
         endpointWorked = true;
-      } else {
-        console.warn(`[EasyZ] Endpoint ${ep + 1} returned 0 features, trying next...`);
       }
     } catch (err) {
       console.warn(`[EasyZ] Endpoint ${ep + 1} failed:`, err.message);
@@ -957,11 +964,20 @@ async function loadAllBoundaries() {
   }
 
   if (!endpointWorked) {
-    statusText.textContent = 'Could not connect to Census boundary API. Please refresh.';
+    splash.querySelector('p').textContent = 'Could not connect to Census API. Please refresh.';
+    splash.querySelector('p').style.color = '#ef4444';
     throw new Error('All Census API endpoints failed');
   }
 
-  // Load remaining states in parallel batches of 5 for speed
+  // Render first state immediately and dismiss splash
+  renderFeatures();
+  splash.classList.add('fade-out');
+  setTimeout(() => splash.classList.add('hidden'), 600);
+
+  // Show corner badge for remaining states
+  badge.classList.remove('hidden');
+
+  // Load remaining states progressively
   const BATCH_SIZE = 5;
   let completed = 1;
   const remaining = STATES.slice(1);
@@ -969,28 +985,49 @@ async function loadAllBoundaries() {
   for (let b = 0; b < remaining.length; b += BATCH_SIZE) {
     const batch = remaining.slice(b, b + BATCH_SIZE);
     const batchNames = batch.map(s => s.abbr).join(', ');
-    statusText.textContent = `Loading ${batchNames}... (${completed}/${STATES.length} states)`;
-    progressFill.style.width = `${(completed / STATES.length) * 80}%`;
+    const pct = Math.round((completed / STATES.length) * 100);
+    loadText.textContent = `${batchNames}... (${completed}/${STATES.length})`;
+    barFill.style.width = `${pct}%`;
 
     const results = await Promise.allSettled(
       batch.map(state => fetchStatePlaces(state.fips, state.abbr))
     );
 
+    let batchFeatures = [];
     results.forEach((result, idx) => {
       if (result.status === 'fulfilled' && result.value.length > 0) {
-        loadedFeatures.push(...result.value);
+        batchFeatures.push(...result.value);
         console.log(`[EasyZ] ${batch[idx].name}: ${result.value.length} places`);
       } else {
         console.warn(`[EasyZ] Failed: ${batch[idx].name}`, result.reason || 'no data');
       }
       completed++;
     });
+
+    // Add batch to map immediately
+    if (batchFeatures.length > 0) {
+      allFeatures.push(...batchFeatures);
+      // Add just the new features to the existing layer (faster than full re-render)
+      const batchLayer = L.geoJSON({ type: 'FeatureCollection', features: batchFeatures }, {
+        style: featureStyle,
+        onEachFeature: function(feature, layer) {
+          layer.on({ click: onFeatureClick, mouseover: onFeatureHover, mouseout: onFeatureOut });
+        }
+      });
+      if (geoLayer) {
+        batchLayer.eachLayer(l => geoLayer.addLayer(l));
+      }
+    }
   }
 
-  statusText.textContent = `Loaded ${loadedFeatures.length.toLocaleString()} municipalities across ${STATES.length} states`;
-  progressFill.style.width = '80%';
-  console.log(`[EasyZ] Total: ${loadedFeatures.length} municipalities nationwide`);
-  return loadedFeatures;
+  // All done — update stats, hide badge
+  barFill.style.width = '100%';
+  loadText.textContent = `${allFeatures.length.toLocaleString()} municipalities loaded`;
+  updateStats();
+  updateTopList();
+  console.log(`[EasyZ] Total: ${allFeatures.length} municipalities nationwide`);
+
+  setTimeout(() => badge.classList.add('hidden'), 2000);
 }
 
 // ============================================================
@@ -1402,12 +1439,7 @@ async function main() {
   initMap();
 
   try {
-    allFeatures = await loadAllBoundaries();
-
-    const progressFill = document.getElementById('progress-fill');
-    const statusText = document.getElementById('loading-status');
-    progressFill.style.width = '90%';
-    statusText.textContent = `Rendering ${allFeatures.length} municipalities...`;
+    await loadAllBoundariesProgressive();
 
     // Log matching stats
     let matched = 0;
@@ -1416,28 +1448,13 @@ async function main() {
     }
     console.log(`[EasyZ] ${matched} verified + ${allFeatures.length - matched} auto-estimated = ${allFeatures.length} total municipalities`);
 
-    // Small delay to allow UI update
-    await new Promise(r => setTimeout(r, 100));
-
-    renderFeatures();
-
-    progressFill.style.width = '100%';
-    statusText.textContent = 'Done!';
-
-    setTimeout(() => {
-      document.getElementById('loading').classList.add('hidden');
-    }, 500);
-
   } catch (err) {
     console.error('[EasyZ] Failed to load boundary data:', err);
-    const statusEl = document.getElementById('loading-status');
-    statusEl.textContent = 'Could not load boundary data. Check your internet and try refreshing.';
-    statusEl.style.color = '#ef4444';
-    // Show error details
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = 'margin-top:12px;font-size:12px;color:#aaa;max-width:400px;word-wrap:break-word;';
-    errorDiv.textContent = `Error: ${err.message}. Open browser console (F12) for details.`;
-    statusEl.parentNode.appendChild(errorDiv);
+    const splash = document.getElementById('splash');
+    if (!splash.classList.contains('hidden')) {
+      splash.querySelector('p').textContent = 'Could not load boundary data. Check your internet and try refreshing.';
+      splash.querySelector('p').style.color = '#ef4444';
+    }
   }
 }
 

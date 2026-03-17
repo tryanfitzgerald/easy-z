@@ -25,7 +25,7 @@ def main():
     new_data_block = f'{DATA_START}{zoning_js}{DATA_END}'
 
     # Read HTML
-    html_path = os.path.join(BASE_DIR, 'municipal_zoning_heatmap.html')
+    html_path = os.path.join(BASE_DIR, 'index.html')
     with open(html_path) as f:
         html = f.read()
 
