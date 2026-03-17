@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Easy Z - Municipal Zoning Heat Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+.info-tip { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #2a3a5e; color: #7faacc; font-size: 10px; font-weight: 700; font-style: italic; cursor: help; position: relative; margin-left: 4px; flex-shrink: 0; }
+.info-tip:hover::after { content: attr(data-tip); position: absolute; left: 50%; bottom: 130%; transform: translateX(-50%); background: #0f1a2e; color: #cdd; border: 1px solid #3b5998; border-radius: 6px; padding: 8px 12px; font-size: 11px; font-weight: 400; font-style: normal; white-space: normal; width: 220px; z-index: 9999; line-height: 1.4; box-shadow: 0 4px 12px rgba(0,0,0,0.5); pointer-events: none; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; height: 100vh; overflow: hidden; background: #1a1a2e; color: #e0e0e0; }
+
+/* Sidebar */
+#sidebar { width: 340px; min-width: 340px; background: #16213e; display: flex; flex-direction: column; overflow-y: auto; border-right: 2px solid #0f3460; z-index: 1000; }
+#sidebar-header { padding: 16px; background: #0f3460; border-bottom: 1px solid #1a1a4e; display: flex; align-items: center; gap: 12px; }
+#sidebar-header h1 { font-size: 20px; font-weight: 700; color: #e94560; letter-spacing: 1px; }
+#sidebar-header p { font-size: 12px; color: #8899aa; margin-top: 4px; }
+.logo-wrap { flex-shrink: 0; }
+
+.sidebar-section { padding: 14px 16px; border-bottom: 1px solid #1a1a3e; }
+.sidebar-section h3 { font-size: 13px; font-weight: 600; color: #7faacc; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Layer toggle */
+.layer-toggle { display: flex; gap: 6px; }
+.layer-btn { flex: 1; padding: 10px 8px; border: 2px solid #2a3a5e; border-radius: 8px; background: #1a2a4e; color: #8899bb; cursor: pointer; font-size: 13px; font-weight: 600; text-align: center; transition: all 0.2s; }
+.layer-btn:hover { border-color: #4a6a9e; color: #aabbdd; }
+.layer-btn.active { border-color: #e94560; background: #2a1a3e; color: #fff; }
+.layer-btn .icon { font-size: 20px; display: block; margin-bottom: 4px; }
+
+/* Legend */
+.legend-item { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+.legend-color { width: 20px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
+
+/* Search */
+#search-input { width: 100%; padding: 10px 12px; border: 2px solid #2a3a5e; border-radius: 8px; background: #1a2a4e; color: #e0e0e0; font-size: 14px; outline: none; }
+#search-input:focus { border-color: #e94560; }
+#address-input:focus { border-color: #e94560; }
+.addr-result { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #1a2a4e; font-size: 12px; color: #cdd; line-height: 1.4; }
+.addr-result:hover { background: #1a2a4e; color: #fff; }
+#search-results { margin-top: 8px; max-height: 200px; overflow-y: auto; }
+.search-result { padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+.search-result:hover { background: #1a2a4e; }
+.search-result .score-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+
+/* Stats */
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.stat-label { font-size: 13px; color: #8899aa; }
+.stat-value { font-size: 15px; font-weight: 700; }
+.stat-bar { height: 6px; border-radius: 3px; background: #1a2a3e; margin-top: 8px; overflow: hidden; }
+.stat-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+
+/* Top municipalities */
+.top-list { list-style: none; }
+.top-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1a2a3e; font-size: 13px; }
+.top-rank { width: 22px; height: 22px; border-radius: 50%; background: #e94560; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.top-score { margin-left: auto; font-weight: 700; font-size: 14px; }
+
+/* Stacking filter */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+.toggle-switch { width: 44px; height: 24px; border-radius: 12px; background: #2a3a5e; cursor: pointer; position: relative; transition: background 0.2s; }
+.toggle-switch.active { background: #e94560; }
+.toggle-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left 0.2s; }
+.toggle-switch.active::after { left: 23px; }
+
+/* Loading overlay */
+#loading { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #1a1a2e; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#loading h2 { color: #e94560; font-size: 24px; margin-bottom: 12px; }
+#loading p { color: #8899aa; font-size: 14px; margin-bottom: 20px; }
+#loading .progress-bar { width: 300px; height: 6px; background: #2a3a5e; border-radius: 3px; overflow: hidden; }
+#loading .progress-fill { height: 100%; background: #e94560; border-radius: 3px; transition: width 0.3s; width: 0%; }
+#loading .status-text { color: #6688aa; font-size: 12px; margin-top: 12px; }
+#loading.hidden { display: none; }
+
+/* Map */
+#map { flex: 1; background: #0a0a1a; }
+.competitor-tip { background: #16213e !important; color: #e0e0e0 !important; border: 1px solid #2a4a6e !important; border-radius: 6px !important; font-size: 12px !important; line-height: 1.5 !important; padding: 6px 10px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; }
+.competitor-tip .leaflet-tooltip-arrow { display: none; }
+.leaflet-popup-content-wrapper { background: #16213e; color: #e0e0e0; border-radius: 10px; border: 1px solid #2a4a6e; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+.leaflet-popup-tip { background: #16213e; }
+.leaflet-popup-content { margin: 14px 16px; font-size: 13px; line-height: 1.6; }
+.popup-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.popup-row { display: flex; justify-content: space-between; padding: 3px 0; }
+.popup-label { color: #7faacc; }
+.popup-value { font-weight: 600; }
+.popup-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-top: 6px; }
+.popup-divider { border: none; border-top: 1px solid #2a3a5e; margin: 8px 0; }
+.popup-unresearched { color: #888; font-style: italic; font-size: 12px; }
+
+/* Mobile */
+@media (max-width: 768px) {
+  #sidebar { width: 100%; min-width: 100%; height: 45vh; }
+  body { flex-direction: column-reverse; }
+  #map { height: 55vh; }
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div style="margin-bottom:12px;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="72" height="72">
+      <ellipse cx="32" cy="36" rx="16" ry="18" fill="#c8956c"/>
+      <rect x="27" y="52" width="10" height="6" rx="2" fill="#b3845e"/>
+      <path d="M28 46 Q32 54 36 46 Q34 50 32 51 Q30 50 28 46Z" fill="#1a1a1a"/>
+      <path d="M27 44 Q30 47 36 44" stroke="#8b5e3c" stroke-width="1" fill="none" stroke-linecap="round"/>
+      <path d="M31 38 Q32 41 33 38" stroke="#a07850" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      <rect x="18" y="30" width="12" height="8" rx="2" fill="#111" stroke="#333" stroke-width="0.8"/>
+      <rect x="34" y="30" width="12" height="8" rx="2" fill="#111" stroke="#333" stroke-width="0.8"/>
+      <line x1="30" y1="34" x2="34" y2="34" stroke="#333" stroke-width="1.2"/>
+      <line x1="18" y1="33" x2="14" y2="31" stroke="#333" stroke-width="1"/>
+      <line x1="46" y1="33" x2="50" y2="31" stroke="#333" stroke-width="1"/>
+      <line x1="21" y1="32" x2="23" y2="32" stroke="#555" stroke-width="0.6" stroke-linecap="round"/>
+      <line x1="37" y1="32" x2="39" y2="32" stroke="#555" stroke-width="0.6" stroke-linecap="round"/>
+      <ellipse cx="15.5" cy="36" rx="2.5" ry="4" fill="#c8956c"/>
+      <ellipse cx="48.5" cy="36" rx="2.5" ry="4" fill="#c8956c"/>
+      <path d="M10 30 L54 30 Q56 30 55 28 L52 26 L10 26 Q8 26 9 28Z" fill="#111"/>
+      <path d="M12 26 Q14 10 32 8 Q50 10 52 26 Z" fill="#111"/>
+      <path d="M16 22 Q24 12 32 10 Q40 12 48 22" stroke="#e94560" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <text x="32" y="23" text-anchor="middle" font-family="Arial Black,Impact,sans-serif" font-size="11" font-weight="900" fill="#e94560" font-style="italic">Z</text>
+      <path d="M20 56 Q22 52 27 52 L37 52 Q42 52 44 56" fill="#222"/>
+      <line x1="32" y1="52" x2="32" y2="58" stroke="#e94560" stroke-width="1.2"/>
+    </svg>
+  </div>
+  <h2 style="color:#e94560;letter-spacing:2px;">EASY Z</h2>
+  <p>Loading municipal boundary data...</p>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  <div class="status-text" id="loading-status">Connecting to Census Bureau...</div>
+</div>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="52" height="52">
+        <!-- Face -->
+        <ellipse cx="32" cy="36" rx="16" ry="18" fill="#c8956c"/>
+        <!-- Neck -->
+        <rect x="27" y="52" width="10" height="6" rx="2" fill="#b3845e"/>
+        <!-- Goatee -->
+        <path d="M28 46 Q32 54 36 46 Q34 50 32 51 Q30 50 28 46Z" fill="#1a1a1a"/>
+        <!-- Mouth smirk -->
+        <path d="M27 44 Q30 47 36 44" stroke="#8b5e3c" stroke-width="1" fill="none" stroke-linecap="round"/>
+        <!-- Nose -->
+        <path d="M31 38 Q32 41 33 38" stroke="#a07850" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <!-- Sunglasses frame -->
+        <rect x="18" y="30" width="12" height="8" rx="2" fill="#111" stroke="#333" stroke-width="0.8"/>
+        <rect x="34" y="30" width="12" height="8" rx="2" fill="#111" stroke="#333" stroke-width="0.8"/>
+        <line x1="30" y1="34" x2="34" y2="34" stroke="#333" stroke-width="1.2"/>
+        <line x1="18" y1="33" x2="14" y2="31" stroke="#333" stroke-width="1"/>
+        <line x1="46" y1="33" x2="50" y2="31" stroke="#333" stroke-width="1"/>
+        <!-- Lens shine -->
+        <line x1="21" y1="32" x2="23" y2="32" stroke="#555" stroke-width="0.6" stroke-linecap="round"/>
+        <line x1="37" y1="32" x2="39" y2="32" stroke="#555" stroke-width="0.6" stroke-linecap="round"/>
+        <!-- Ears -->
+        <ellipse cx="15.5" cy="36" rx="2.5" ry="4" fill="#c8956c"/>
+        <ellipse cx="48.5" cy="36" rx="2.5" ry="4" fill="#c8956c"/>
+        <!-- Cap - bill -->
+        <path d="M10 30 L54 30 Q56 30 55 28 L52 26 L10 26 Q8 26 9 28Z" fill="#111"/>
+        <!-- Cap - crown -->
+        <path d="M12 26 Q14 10 32 8 Q50 10 52 26 Z" fill="#111"/>
+        <!-- Cap highlight stripe -->
+        <path d="M16 22 Q24 12 32 10 Q40 12 48 22" stroke="#e94560" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <!-- "Z" on cap -->
+        <text x="32" y="23" text-anchor="middle" font-family="Arial Black,Impact,sans-serif" font-size="11" font-weight="900" fill="#e94560" font-style="italic">Z</text>
+        <!-- Collar / jacket hint -->
+        <path d="M20 56 Q22 52 27 52 L37 52 Q42 52 44 56" fill="#222"/>
+        <line x1="32" y1="52" x2="32" y2="58" stroke="#e94560" stroke-width="1.2"/>
+      </svg>
+    </div>
+    <div>
+      <h1>EASY Z</h1>
+      <p>Municipal Zoning Friction Map &mdash; Nationwide</p>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 style="display:flex;align-items:center;">Use Type<span class="info-tip" data-tip="Select which business type to score. The map recolors to show zoning friction for that specific use. Each use has different approval pathways and zone requirements.">i</span></h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+      <div class="layer-btn active" id="btn-carwash" onclick="setLayer('carwash')" style="padding:8px 4px;font-size:11px;">
+        <span class="icon" style="font-size:16px;">&#128663;</span>Car Wash
+      </div>
+      <div class="layer-btn" id="btn-drivethru" onclick="setLayer('drivethru')" style="padding:8px 4px;font-size:11px;">
+        <span class="icon" style="font-size:16px;">&#9749;</span>Drive-Thru
+      </div>
+      <div class="layer-btn" id="btn-collision" onclick="setLayer('collision')" style="padding:8px 4px;font-size:11px;">
+        <span class="icon" style="font-size:16px;">&#128295;</span>Collision
+      </div>
+      <div class="layer-btn" id="btn-autosales" onclick="setLayer('autosales')" style="padding:8px 4px;font-size:11px;">
+        <span class="icon" style="font-size:16px;">&#128663;</span>Auto Sales
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 style="display:flex;align-items:center;">Address Search<span class="info-tip" data-tip="Search any US address or place. Click a result to fly to that location on the map.">i</span></h3>
+    <input type="text" id="address-input" placeholder="123 Main St, Chicago, IL..." oninput="handleAddressSearch(this.value)" onkeydown="if(event.key==='Enter')handleAddressSearch(this.value)" style="width:100%;padding:10px 12px;border:2px solid #2a3a5e;border-radius:8px;background:#1a2a4e;color:#e0e0e0;font-size:13px;outline:none;box-sizing:border-box;" />
+    <div id="address-results" style="max-height:160px;overflow-y:auto;"></div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3>Legend</h3>
+    <div class="legend-item"><div class="legend-color" style="background:#22c55e;"></div>Low friction (80+)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#86efac;"></div>Moderate friction (65-79)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#facc15;"></div>Significant friction (50-64)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#f97316;"></div>High friction (30-49)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#ef4444;"></div>Prohibitive (0-29)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#4a5568;border:1px dashed #888;"></div>Estimated</div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3>Base Map</h3>
+    <div class="layer-toggle">
+      <div class="layer-btn active" id="basemap-dark" onclick="setBasemap('dark')" style="padding:6px 4px;font-size:11px;">
+        <span class="icon" style="font-size:14px;">🌙</span>Dark
+      </div>
+      <div class="layer-btn" id="basemap-streets" onclick="setBasemap('streets')" style="padding:6px 4px;font-size:11px;">
+        <span class="icon" style="font-size:14px;">🛣️</span>Streets
+      </div>
+      <div class="layer-btn" id="basemap-satellite" onclick="setBasemap('satellite')" style="padding:6px 4px;font-size:11px;">
+        <span class="icon" style="font-size:14px;">🛰️</span>Satellite
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 style="display:flex;align-items:center;">Competitors<span class="info-tip" data-tip="Toggle to show existing businesses on the map matching your selected use type. Data from OpenStreetMap. Zoom in for best results.">i</span></h3>
+    <div class="toggle-row">
+      <span style="font-size:13px;display:flex;align-items:center;" id="competitor-label">Show existing car washes</span>
+      <div class="toggle-switch" id="toggle-competitors" onclick="toggleCompetitors()"></div>
+    </div>
+    <div id="competitor-count" style="font-size:11px;color:#889;margin-top:6px;display:none;"></div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 style="display:flex;align-items:center;">Search Municipality<span class="info-tip" data-tip="Search any incorporated place in the US. Click a result to zoom in and see its zoning details for the selected use type.">i</span></h3>
+    <input type="text" id="search-input" placeholder="Type a city name..." oninput="handleSearch(this.value)" />
+    <div id="search-results"></div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 id="stats-title">Statistics (Car Wash)</h3>
+    <div class="stat-row"><span class="stat-label">Low friction (80+)</span><span class="stat-value" id="stat-permitted" style="color:#22c55e;">-</span></div>
+    <div class="stat-row"><span class="stat-label">Moderate (65-79)</span><span class="stat-value" id="stat-likely" style="color:#86efac;">-</span></div>
+    <div class="stat-row"><span class="stat-label">Significant (50-64)</span><span class="stat-value" id="stat-conditional" style="color:#facc15;">-</span></div>
+    <div class="stat-row"><span class="stat-label">High friction (30-49)</span><span class="stat-value" id="stat-restrictive" style="color:#f97316;">-</span></div>
+    <div class="stat-row"><span class="stat-label">Prohibitive (0-29)</span><span class="stat-value" id="stat-prohibited" style="color:#ef4444;">-</span></div>
+    <div class="stat-row"><span class="stat-label">Estimated</span><span class="stat-value" id="stat-unresearched" style="color:#f97316;">-</span></div>
+    <div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-fill" style="background: linear-gradient(90deg, #22c55e, #facc15, #ef4444); width:0%;"></div></div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 id="top-title">Top 10 (Car Wash)</h3>
+    <ul class="top-list" id="top-list"></ul>
+  </div>
+
+  <div class="sidebar-section" style="border-bottom:none; color:#556; font-size:11px; padding-bottom:40px;">
+    <p>Data: 88 verified municipalities. Remaining municipalities shown as unresearched (gray). Boundary polygons from US Census TIGER/Line.</p>
+    <p style="margin-top:6px;">Shorewood Development Group &mdash; 2026</p>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ============================================================
+// ZONING DATA (88 verified municipalities, embedded)
+// ============================================================
+const ZONING_DATA = /*ZONING_DATA_START*/{"Aurora, IL":{"name":"Aurora","state":"IL","composite":61,"factors":{"zoning":18,"process":9,"site":13,"competition":10,"political":12},"carwash":{"status":"conditional","score":62,"pathway":"Permitted","zones":"B-2, B-3, M-1","special_use":false},"drivethru":{"status":"conditional","score":62,"pathway":"Permitted","zones":"B-2, B-3, B-4","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":58,"pathway":"Conditional Use","zones":"M-1, M-2","special_use":true},"autosales":{"status":"conditional","score":60,"pathway":"Permitted","zones":"B-3, B-4, M-1","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://gis.aurora-il.org","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Pro-development, but large city = process friction.","population":197000},"Joliet, IL":{"name":"Joliet","state":"IL","composite":64,"factors":{"zoning":18,"process":10,"site":13,"competition":11,"political":12},"carwash":{"status":"conditional","score":64,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"conditional","score":64,"pathway":"Permitted","zones":"B-3, B-4, B-5","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":62,"pathway":"Permitted","zones":"B-4, M-1, M-2","special_use":false},"autosales":{"status":"conditional","score":64,"pathway":"Permitted","zones":"B-3, B-4, B-5","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.joliet.gov/departments/community-development/gis-maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Business-friendly but growing = competition.","population":148000},"Des Plaines, IL":{"name":"Des Plaines","state":"IL","composite":60,"factors":{"zoning":18,"process":9,"site":13,"competition":11,"political":11},"carwash":{"status":"conditional","score":62,"pathway":"Permitted","zones":"C-3, C-4","special_use":false},"drivethru":{"status":"conditional","score":60,"pathway":"Permitted","zones":"C-3, C-4","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":56,"pathway":"Conditional Use","zones":"C-4, M-1","special_use":true},"autosales":{"status":"conditional","score":60,"pathway":"Permitted","zones":"C-3, C-4","special_use":false},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.desplaines.org/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"8-car stacking per Sec. 12-9-4.","population":58000},"Bolingbrook, IL":{"name":"Bolingbrook","state":"IL","composite":66,"factors":{"zoning":18,"process":11,"site":14,"competition":12,"political":12},"carwash":{"status":"likely_permitted","score":67,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"drivethru":{"status":"likely_permitted","score":67,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":65,"pathway":"Permitted","zones":"C-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":65,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Growth-oriented but IL process friction.","population":73000},"Plainfield, IL":{"name":"Plainfield","state":"IL","composite":74,"factors":{"zoning":18,"process":13,"site":16,"competition":14,"political":14},"carwash":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":73,"pathway":"Permitted","zones":"B-4, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":73,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Rapidly growing. Less competition. Pro-development.","population":41000},"Romeoville, IL":{"name":"Romeoville","state":"IL","composite":74,"factors":{"zoning":18,"process":13,"site":15,"competition":14,"political":14},"carwash":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"drivethru":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":72,"pathway":"Permitted","zones":"C-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":39000},"Addison, IL":{"name":"Addison","state":"IL","composite":69,"factors":{"zoning":18,"process":12,"site":14,"competition":13,"political":13},"carwash":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"M-1, M-2","special_use":false},"autosales":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":36000},"Carol Stream, IL":{"name":"Carol Stream","state":"IL","composite":69,"factors":{"zoning":18,"process":12,"site":14,"competition":13,"political":13},"carwash":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":40000},"Glendale Heights, IL":{"name":"Glendale Heights","state":"IL","composite":69,"factors":{"zoning":18,"process":12,"site":14,"competition":13,"political":13},"carwash":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":34000},"Bloomingdale, IL":{"name":"Bloomingdale","state":"IL","composite":75,"factors":{"zoning":18,"process":13,"site":16,"competition":15,"political":14},"carwash":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":22000},"Bensenville, IL":{"name":"Bensenville","state":"IL","composite":79,"factors":{"zoning":18,"process":14,"site":16,"competition":16,"political":15},"carwash":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":21000},"Wood Dale, IL":{"name":"Wood Dale","state":"IL","composite":79,"factors":{"zoning":18,"process":14,"site":16,"competition":16,"political":15},"carwash":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":14000},"Itasca, IL":{"name":"Itasca","state":"IL","composite":83,"factors":{"zoning":18,"process":15,"site":16,"competition":18,"political":16},"carwash":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false},"drivethru":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false,"stacking_cars":5},"collision":{"status":"permitted","score":81,"pathway":"Permitted","zones":"B-2, M-1","special_use":false},"autosales":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Small town \u2014 less competition but limited sites.","population":8500},"Elk Grove Village, IL":{"name":"Elk Grove Village","state":"IL","composite":70,"factors":{"zoning":18,"process":12,"site":15,"competition":13,"political":13},"carwash":{"status":"likely_permitted","score":71,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":71,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":69,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":69,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.elkgrove.org/gis","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":32000},"Waukegan, IL":{"name":"Waukegan","state":"IL","composite":65,"factors":{"zoning":18,"process":11,"site":14,"competition":12,"political":11},"carwash":{"status":"likely_permitted","score":66,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"likely_permitted","score":66,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":64,"pathway":"Permitted","zones":"B-4, M-1","special_use":false},"autosales":{"status":"conditional","score":64,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":87000},"Antioch, IL":{"name":"Antioch","state":"IL","composite":80,"factors":{"zoning":18,"process":14,"site":16,"competition":17,"political":15},"carwash":{"status":"permitted","score":80,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"permitted","score":80,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"permitted","score":80,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":14000},"Round Lake, IL":{"name":"Round Lake","state":"IL","composite":80,"factors":{"zoning":18,"process":14,"site":16,"competition":17,"political":15},"carwash":{"status":"permitted","score":80,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"drivethru":{"status":"permitted","score":80,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"C-3, M-1","special_use":false},"autosales":{"status":"permitted","score":80,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":18500},"Mundelein, IL":{"name":"Mundelein","state":"IL","composite":69,"factors":{"zoning":18,"process":12,"site":14,"competition":13,"political":13},"carwash":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"B-4, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":31000},"Grayslake, IL":{"name":"Grayslake","state":"IL","composite":79,"factors":{"zoning":18,"process":14,"site":16,"competition":16,"political":15},"carwash":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":21000},"Tinley Park, IL":{"name":"Tinley Park","state":"IL","composite":62,"factors":{"zoning":18,"process":10,"site":13,"competition":11,"political":11},"carwash":{"status":"conditional","score":63,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"conditional","score":63,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":61,"pathway":"Permitted","zones":"B-4, M-1","special_use":false},"autosales":{"status":"conditional","score":61,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":57000},"Homer Glen, IL":{"name":"Homer Glen","state":"IL","composite":76,"factors":{"zoning":18,"process":13,"site":16,"competition":16,"political":14},"carwash":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":21500},"Blue Island, IL":{"name":"Blue Island","state":"IL","composite":74,"factors":{"zoning":18,"process":13,"site":16,"competition":15,"political":13},"carwash":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"drivethru":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":73,"pathway":"Permitted","zones":"C-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":73,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":23000},"Alsip, IL":{"name":"Alsip","state":"IL","composite":76,"factors":{"zoning":18,"process":13,"site":16,"competition":15,"political":14},"carwash":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"drivethru":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"C-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":19000},"Oak Forest, IL":{"name":"Oak Forest","state":"IL","composite":70,"factors":{"zoning":18,"process":12,"site":14,"competition":14,"political":13},"carwash":{"status":"likely_permitted","score":71,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":71,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":69,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":69,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":28000},"Berwyn, IL":{"name":"Berwyn","state":"IL","composite":60,"factors":{"zoning":18,"process":10,"site":12,"competition":11,"political":11},"carwash":{"status":"conditional","score":62,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"drivethru":{"status":"conditional","score":62,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":56,"pathway":"Conditional Use","zones":"C-3, M-1","special_use":true},"autosales":{"status":"conditional","score":58,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Dense inner suburb. Limited parcels.","population":55000},"Cicero, IL":{"name":"Cicero","state":"IL","composite":58,"factors":{"zoning":18,"process":9,"site":12,"competition":10,"political":10},"carwash":{"status":"conditional","score":59,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"drivethru":{"status":"conditional","score":59,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":55,"pathway":"Permitted","zones":"C-3, M-1","special_use":false},"autosales":{"status":"conditional","score":57,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Dense. Political complexity.","population":84000},"Melrose Park, IL":{"name":"Melrose Park","state":"IL","composite":75,"factors":{"zoning":18,"process":13,"site":15,"competition":15,"political":14},"carwash":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"C-2","special_use":false},"drivethru":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"C-2","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":73,"pathway":"Permitted","zones":"C-2, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"C-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":23000},"Bellwood, IL":{"name":"Bellwood","state":"IL","composite":76,"factors":{"zoning":18,"process":13,"site":15,"competition":16,"political":14},"carwash":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"C-2","special_use":false},"drivethru":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"C-2","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"C-2, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"C-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":19000},"Warrenville, IL":{"name":"Warrenville","state":"IL","composite":79,"factors":{"zoning":18,"process":14,"site":15,"competition":17,"political":15},"carwash":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2","special_use":false},"drivethru":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-2, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"B-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":13000},"Winfield, IL":{"name":"Winfield","state":"IL","composite":83,"factors":{"zoning":18,"process":15,"site":16,"competition":18,"political":16},"carwash":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false},"drivethru":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false,"stacking_cars":5},"collision":{"status":"permitted","score":81,"pathway":"Permitted","zones":"B-2, M-1","special_use":false},"autosales":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":9200},"Villa Park, IL":{"name":"Villa Park","state":"IL","composite":73,"factors":{"zoning":18,"process":13,"site":15,"competition":14,"political":14},"carwash":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":72,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":72,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":22000},"Lockport, IL":{"name":"Lockport","state":"IL","composite":71,"factors":{"zoning":18,"process":12,"site":15,"competition":14,"political":13},"carwash":{"status":"likely_permitted","score":72,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"likely_permitted","score":72,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-4, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":25000},"Green Bay, WI":{"name":"Green Bay","state":"WI","composite":67,"factors":{"zoning":18,"process":12,"site":13,"competition":11,"political":13},"carwash":{"status":"likely_permitted","score":67,"pathway":"Permitted","zones":"C-1, C-2, C-3","special_use":false},"drivethru":{"status":"likely_permitted","score":67,"pathway":"Permitted","zones":"C-1, C-2, C-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":65,"pathway":"Permitted","zones":"C-3, IL","special_use":false},"autosales":{"status":"likely_permitted","score":67,"pathway":"Permitted","zones":"C-2, C-3, IL","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://greenbaywi.gov/gis","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":104000},"Wauwatosa, WI":{"name":"Wauwatosa","state":"WI","composite":68,"factors":{"zoning":18,"process":13,"site":14,"competition":12,"political":13},"carwash":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":64,"pathway":"Conditional Use","zones":"C-3, IL","special_use":true},"autosales":{"status":"conditional","score":64,"pathway":"Conditional Use","zones":"C-3","special_use":true},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.wauwatosa.net/government/gis-maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Collision/auto sales more restricted.","population":48000},"Oak Creek, WI":{"name":"Oak Creek","state":"WI","composite":77,"factors":{"zoning":18,"process":15,"site":15,"competition":14,"political":15},"carwash":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"B-4, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":36500},"Sun Prairie, WI":{"name":"Sun Prairie","state":"WI","composite":78,"factors":{"zoning":18,"process":15,"site":15,"competition":15,"political":15},"carwash":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"CC, HC","special_use":false},"drivethru":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"CC, HC","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"HC, LI","special_use":false},"autosales":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"CC, HC","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":32000},"Menomonee Falls, WI":{"name":"Menomonee Falls","state":"WI","composite":77,"factors":{"zoning":18,"process":15,"site":15,"competition":14,"political":15},"carwash":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"B-4, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":35000},"Germantown, WI":{"name":"Germantown","state":"WI","composite":82,"factors":{"zoning":18,"process":16,"site":16,"competition":16,"political":16},"carwash":{"status":"permitted","score":82,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"drivethru":{"status":"permitted","score":82,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":5},"collision":{"status":"permitted","score":80,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"permitted","score":82,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":20000},"West Bend, WI":{"name":"West Bend","state":"WI","composite":78,"factors":{"zoning":18,"process":15,"site":15,"competition":15,"political":15},"carwash":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"B-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"B-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":32000},"De Pere, WI":{"name":"De Pere","state":"WI","composite":82,"factors":{"zoning":18,"process":16,"site":16,"competition":16,"political":16},"carwash":{"status":"permitted","score":82,"pathway":"Permitted","zones":"C-1, C-2","special_use":false},"drivethru":{"status":"permitted","score":82,"pathway":"Permitted","zones":"C-1, C-2","special_use":false,"stacking_cars":5},"collision":{"status":"permitted","score":80,"pathway":"Permitted","zones":"C-2, IL","special_use":false},"autosales":{"status":"permitted","score":82,"pathway":"Permitted","zones":"C-1, C-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":24000},"Ashwaubenon, WI":{"name":"Ashwaubenon","state":"WI","composite":82,"factors":{"zoning":18,"process":16,"site":16,"competition":16,"political":16},"carwash":{"status":"permitted","score":82,"pathway":"Permitted","zones":"C-1, C-2","special_use":false},"drivethru":{"status":"permitted","score":82,"pathway":"Permitted","zones":"C-1, C-2","special_use":false,"stacking_cars":5},"collision":{"status":"permitted","score":80,"pathway":"Permitted","zones":"C-2, IL","special_use":false},"autosales":{"status":"permitted","score":82,"pathway":"Permitted","zones":"C-1, C-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":17000},"Grafton, WI":{"name":"Grafton","state":"WI","composite":83,"factors":{"zoning":18,"process":16,"site":16,"competition":17,"political":16},"carwash":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false},"drivethru":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false,"stacking_cars":5},"collision":{"status":"permitted","score":81,"pathway":"Permitted","zones":"B-2, M-1","special_use":false},"autosales":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":11600},"Port Washington, WI":{"name":"Port Washington","state":"WI","composite":83,"factors":{"zoning":18,"process":16,"site":16,"competition":17,"political":16},"carwash":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false},"drivethru":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false,"stacking_cars":5},"collision":{"status":"permitted","score":81,"pathway":"Permitted","zones":"B-2, M-1","special_use":false},"autosales":{"status":"permitted","score":83,"pathway":"Permitted","zones":"B-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":11600},"Fitchburg, WI":{"name":"Fitchburg","state":"WI","composite":78,"factors":{"zoning":18,"process":15,"site":15,"competition":15,"political":15},"carwash":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"CG, CH","special_use":false},"drivethru":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"CG, CH","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"CH, LI","special_use":false},"autosales":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"CG, CH","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":28000},"Middleton, WI":{"name":"Middleton","state":"WI","composite":77,"factors":{"zoning":18,"process":15,"site":15,"competition":15,"political":15},"carwash":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"C-2","special_use":false},"drivethru":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"C-2","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"C-2, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"C-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Near Madison \u2014 some design review friction.","population":19000},"Glendale, WI":{"name":"Glendale","state":"WI","composite":77,"factors":{"zoning":18,"process":15,"site":15,"competition":15,"political":15},"carwash":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"B-3","special_use":false},"drivethru":{"status":"likely_permitted","score":78,"pathway":"Permitted","zones":"B-3","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":74,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":76,"pathway":"Permitted","zones":"B-3","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":13000},"Madison, WI":{"name":"Madison","state":"WI","composite":49,"factors":{"zoning":16,"process":8,"site":10,"competition":8,"political":9},"carwash":{"status":"conditional","score":51,"pathway":"Permitted","zones":"CC, CC-T","special_use":false},"drivethru":{"status":"conditional","score":53,"pathway":"Permitted","zones":"CC, NMX, TSS","special_use":false,"stacking_cars":8},"collision":{"status":"restrictive","score":45,"pathway":"Conditional Use","zones":"IL, IG","special_use":true},"autosales":{"status":"restrictive","score":45,"pathway":"Conditional Use","zones":"CC-T, SE","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://cityofmadison.maps.arcgis.com","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Large city. Design review. Auto uses restricted in core.","population":269000},"Waukesha, WI":{"name":"Waukesha","state":"WI","composite":64,"factors":{"zoning":16,"process":12,"site":13,"competition":11,"political":12},"carwash":{"status":"conditional","score":64,"pathway":"Permitted","zones":"B-3, B-4","special_use":false},"drivethru":{"status":"likely_permitted","score":66,"pathway":"Permitted","zones":"B-3, B-4, B-5","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":62,"pathway":"Permitted","zones":"B-4, M-1","special_use":false},"autosales":{"status":"conditional","score":64,"pathway":"Permitted","zones":"B-3, B-4, B-5","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.ci.waukesha.wi.us/gis","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":72000},"Verona, WI":{"name":"Verona","state":"WI","composite":77,"factors":{"zoning":16,"process":15,"site":15,"competition":16,"political":15},"carwash":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"C-1, C-2","special_use":false},"drivethru":{"status":"likely_permitted","score":79,"pathway":"Permitted","zones":"C-1, C-2","special_use":false,"stacking_cars":5},"collision":{"status":"likely_permitted","score":75,"pathway":"Permitted","zones":"C-2, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":77,"pathway":"Permitted","zones":"C-1, C-2","special_use":false},"requirements":{"stacking_cars":5,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":13800},"Chicago, IL":{"name":"Chicago","state":"IL","composite":32,"factors":{"zoning":12,"process":3,"site":8,"competition":5,"political":6},"carwash":{"status":"restrictive","score":34,"pathway":"Conditional Use","zones":"B3-2, C1-2, C1-3","special_use":false},"drivethru":{"status":"restrictive","score":34,"pathway":"Conditional Use","zones":"B3-2, C1-2, C1-3","special_use":false,"stacking_cars":8},"collision":{"status":"restrictive","score":30,"pathway":"Special Use","zones":"C2-3, M1-2","special_use":true},"autosales":{"status":"restrictive","score":30,"pathway":"Special Use","zones":"C2-2, C2-3, M1-2","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://gisapps.chicago.gov/ZoningMapWeb/","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Aldermanic approval is key. Massive process friction.","population":2700000},"Milwaukee, WI":{"name":"Milwaukee","state":"WI","composite":43,"factors":{"zoning":12,"process":7,"site":9,"competition":6,"political":8},"carwash":{"status":"restrictive","score":42,"pathway":"Conditional Use","zones":"LB2, CS","special_use":true},"drivethru":{"status":"restrictive","score":48,"pathway":"Permitted","zones":"LB2, CS, IL","special_use":false,"stacking_cars":8},"collision":{"status":"restrictive","score":40,"pathway":"Conditional Use","zones":"CS, IL, IG","special_use":true},"autosales":{"status":"restrictive","score":40,"pathway":"Conditional Use","zones":"CS, IL","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://city.milwaukee.gov/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Large metro. Auto uses face extra friction.","population":577000},"Wheaton, IL":{"name":"Wheaton","state":"IL","composite":58,"factors":{"zoning":12,"process":10,"site":13,"competition":11,"political":11},"carwash":{"status":"conditional","score":57,"pathway":"Conditional Use","zones":"C-3, C-4","special_use":true},"drivethru":{"status":"conditional","score":61,"pathway":"Permitted","zones":"C-3, C-4","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":55,"pathway":"Conditional Use","zones":"C-4, M-1","special_use":true},"autosales":{"status":"conditional","score":57,"pathway":"Conditional Use","zones":"C-3, C-4","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":53000},"Skokie, IL":{"name":"Skokie","state":"IL","composite":53,"factors":{"zoning":12,"process":9,"site":12,"competition":10,"political":10},"carwash":{"status":"conditional","score":53,"pathway":"Conditional Use","zones":"B2, B3","special_use":true},"drivethru":{"status":"conditional","score":57,"pathway":"Permitted","zones":"B2, B3","special_use":false,"stacking_cars":8},"collision":{"status":"restrictive","score":49,"pathway":"Special Use","zones":"B3, M-1","special_use":true},"autosales":{"status":"conditional","score":51,"pathway":"Conditional Use","zones":"B2, B3","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.skokie.org/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Collision repair special use in commercial.","population":65000},"Arlington Heights, IL":{"name":"Arlington Heights","state":"IL","composite":51,"factors":{"zoning":12,"process":9,"site":12,"competition":10,"political":10},"carwash":{"status":"conditional","score":53,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true},"drivethru":{"status":"conditional","score":53,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true,"stacking_cars":8},"collision":{"status":"restrictive","score":49,"pathway":"Special Use","zones":"B-4, M-1","special_use":true},"autosales":{"status":"restrictive","score":49,"pathway":"Special Use","zones":"B-3, B-4","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.vah.com/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"All auto uses face scrutiny.","population":76000},"Downers Grove, IL":{"name":"Downers Grove","state":"IL","composite":60,"factors":{"zoning":12,"process":11,"site":14,"competition":12,"political":12},"carwash":{"status":"conditional","score":61,"pathway":"Conditional Use","zones":"B-2, B-3","special_use":true},"drivethru":{"status":"conditional","score":61,"pathway":"Conditional Use","zones":"B-2, B-3","special_use":true,"stacking_cars":8},"collision":{"status":"conditional","score":59,"pathway":"Conditional Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"conditional","score":59,"pathway":"Conditional Use","zones":"B-2, B-3","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.downers.us/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":49000},"New Berlin, WI":{"name":"New Berlin","state":"WI","composite":69,"factors":{"zoning":12,"process":14,"site":14,"competition":13,"political":14},"carwash":{"status":"likely_permitted","score":67,"pathway":"Conditional Use","zones":"B-3","special_use":true},"drivethru":{"status":"likely_permitted","score":71,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":69,"pathway":"Permitted","zones":"B-3, M-1","special_use":false},"autosales":{"status":"likely_permitted","score":69,"pathway":"Permitted","zones":"B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":39000},"Palatine, IL":{"name":"Palatine","state":"IL","composite":56,"factors":{"zoning":12,"process":9,"site":13,"competition":11,"political":11},"carwash":{"status":"conditional","score":56,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true},"drivethru":{"status":"conditional","score":60,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":52,"pathway":"Special Use","zones":"B-4, M-1","special_use":true},"autosales":{"status":"conditional","score":54,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":68000},"Rolling Meadows, IL":{"name":"Rolling Meadows","state":"IL","composite":70,"factors":{"zoning":12,"process":13,"site":15,"competition":14,"political":14},"carwash":{"status":"likely_permitted","score":68,"pathway":"Conditional Use","zones":"C-3","special_use":true},"drivethru":{"status":"likely_permitted","score":72,"pathway":"Permitted","zones":"C-3, C-4","special_use":false,"stacking_cars":6},"collision":{"status":"likely_permitted","score":68,"pathway":"Conditional Use","zones":"C-4, M-1","special_use":true},"autosales":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"C-3, C-4","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":24000},"Mount Prospect, IL":{"name":"Mount Prospect","state":"IL","composite":57,"factors":{"zoning":12,"process":10,"site":13,"competition":11,"political":11},"carwash":{"status":"conditional","score":57,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true},"drivethru":{"status":"conditional","score":61,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":53,"pathway":"Special Use","zones":"B-4, M-1","special_use":true},"autosales":{"status":"conditional","score":55,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":54000},"Hoffman Estates, IL":{"name":"Hoffman Estates","state":"IL","composite":58,"factors":{"zoning":12,"process":10,"site":13,"competition":11,"political":11},"carwash":{"status":"conditional","score":57,"pathway":"Conditional Use","zones":"B-3","special_use":true},"drivethru":{"status":"conditional","score":61,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":55,"pathway":"Conditional Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"conditional","score":57,"pathway":"Conditional Use","zones":"B-3","special_use":true},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":52000},"Northbrook, IL":{"name":"Northbrook","state":"IL","composite":55,"factors":{"zoning":12,"process":10,"site":13,"competition":12,"political":8},"carwash":{"status":"conditional","score":55,"pathway":"Conditional Use","zones":"C-3","special_use":true},"drivethru":{"status":"conditional","score":59,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":51,"pathway":"Special Use","zones":"C-4, M-1","special_use":true},"autosales":{"status":"conditional","score":51,"pathway":"Special Use","zones":"C-3, C-4","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.northbrook.il.us/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Affluent. Auto-intensive uses face resistance.","population":33000},"Glenview, IL":{"name":"Glenview","state":"IL","composite":56,"factors":{"zoning":12,"process":10,"site":13,"competition":12,"political":9},"carwash":{"status":"conditional","score":56,"pathway":"Conditional Use","zones":"B-3","special_use":true},"drivethru":{"status":"conditional","score":60,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":52,"pathway":"Special Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"conditional","score":52,"pathway":"Special Use","zones":"B-3","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":47000},"Elmhurst, IL":{"name":"Elmhurst","state":"IL","composite":61,"factors":{"zoning":12,"process":11,"site":14,"competition":12,"political":12},"carwash":{"status":"conditional","score":61,"pathway":"Conditional Use","zones":"C-3, C-4","special_use":true},"drivethru":{"status":"likely_permitted","score":65,"pathway":"Permitted","zones":"C-3, C-4","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":57,"pathway":"Special Use","zones":"C-4, M-1","special_use":true},"autosales":{"status":"conditional","score":59,"pathway":"Conditional Use","zones":"C-3, C-4","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":46000},"Lombard, IL":{"name":"Lombard","state":"IL","composite":63,"factors":{"zoning":12,"process":11,"site":14,"competition":13,"political":12},"carwash":{"status":"conditional","score":62,"pathway":"Conditional Use","zones":"B-3","special_use":true},"drivethru":{"status":"likely_permitted","score":66,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":60,"pathway":"Conditional Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"conditional","score":62,"pathway":"Conditional Use","zones":"B-3","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":44000},"Orland Park, IL":{"name":"Orland Park","state":"IL","composite":58,"factors":{"zoning":12,"process":10,"site":13,"competition":11,"political":11},"carwash":{"status":"conditional","score":57,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true},"drivethru":{"status":"conditional","score":61,"pathway":"Permitted","zones":"B-3, B-4","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":55,"pathway":"Conditional Use","zones":"B-4, M-1","special_use":true},"autosales":{"status":"conditional","score":57,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.orlandpark.org/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":58000},"Brookfield, WI":{"name":"Brookfield","state":"WI","composite":61,"factors":{"zoning":12,"process":13,"site":14,"competition":12,"political":12},"carwash":{"status":"conditional","score":63,"pathway":"Conditional Use","zones":"B-3","special_use":true},"drivethru":{"status":"conditional","score":59,"pathway":"Special Use","zones":"B-3","special_use":true,"stacking_cars":10},"collision":{"status":"conditional","score":61,"pathway":"Conditional Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"conditional","score":63,"pathway":"Conditional Use","zones":"B-3","special_use":true},"requirements":{"stacking_cars":10,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":true,"moratorium":false,"zoning_map_url":"https://www.ci.brookfield.wi.us/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Stacking issues for DT. 10-car requirement.","population":38000},"Evanston, IL":{"name":"Evanston","state":"IL","composite":48,"factors":{"zoning":8,"process":8,"site":11,"competition":10,"political":9},"carwash":{"status":"restrictive","score":46,"pathway":"Special Use","zones":"C1a, C2","special_use":true},"drivethru":{"status":"conditional","score":54,"pathway":"Permitted","zones":"C1, C1a, C2","special_use":false,"stacking_cars":8},"collision":{"status":"restrictive","score":44,"pathway":"Special Use","zones":"C2, I1","special_use":true},"autosales":{"status":"restrictive","score":44,"pathway":"Special Use","zones":"C2","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"https://www.cityofevanston.org/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Dense urban. Anti-auto sentiment. High process friction.","population":74000},"Oak Park, IL":{"name":"Oak Park","state":"IL","composite":48,"factors":{"zoning":8,"process":8,"site":11,"competition":10,"political":9},"carwash":{"status":"restrictive","score":46,"pathway":"Special Use","zones":"B (Business)","special_use":true},"drivethru":{"status":"conditional","score":54,"pathway":"Permitted","zones":"B (Business)","special_use":false,"stacking_cars":8},"collision":{"status":"restrictive","score":44,"pathway":"Special Use","zones":"B, I (Industrial)","special_use":true},"autosales":{"status":"restrictive","score":44,"pathway":"Special Use","zones":"B (Business)","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Progressive suburb. Anti-auto sprawl sentiment.","population":52000},"Mequon, WI":{"name":"Mequon","state":"WI","composite":63,"factors":{"zoning":8,"process":14,"site":14,"competition":14,"political":10},"carwash":{"status":"conditional","score":60,"pathway":"Special Use","zones":"B-2","special_use":true},"drivethru":{"status":"likely_permitted","score":68,"pathway":"Permitted","zones":"B-2","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":62,"pathway":"Conditional Use","zones":"B-2, M-1","special_use":true},"autosales":{"status":"conditional","score":62,"pathway":"Conditional Use","zones":"B-2","special_use":true},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Affluent suburb.","population":24000},"Shorewood, WI":{"name":"Shorewood","state":"WI","composite":52,"factors":{"zoning":8,"process":12,"site":12,"competition":12,"political":8},"carwash":{"status":"conditional","score":52,"pathway":"Special Use","zones":"B-4","special_use":true},"drivethru":{"status":"conditional","score":56,"pathway":"Conditional Use","zones":"B-4","special_use":true,"stacking_cars":6},"collision":{"status":"restrictive","score":48,"pathway":"Prohibited","zones":"None","special_use":false},"autosales":{"status":"restrictive","score":48,"pathway":"Prohibited","zones":"None","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Dense, walkable. Anti-auto. No auto-intensive uses allowed.","population":13000},"Park Ridge, IL":{"name":"Park Ridge","state":"IL","composite":54,"factors":{"zoning":8,"process":10,"site":13,"competition":12,"political":9},"carwash":{"status":"conditional","score":52,"pathway":"Special Use","zones":"C-3","special_use":true},"drivethru":{"status":"conditional","score":60,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":50,"pathway":"Special Use","zones":"C-4, M-1","special_use":true},"autosales":{"status":"conditional","score":52,"pathway":"Special Use","zones":"C-3","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":37000},"Wilmette, IL":{"name":"Wilmette","state":"IL","composite":47,"factors":{"zoning":8,"process":9,"site":12,"competition":12,"political":6},"carwash":{"status":"restrictive","score":47,"pathway":"Special Use","zones":"GC-1","special_use":true},"drivethru":{"status":"conditional","score":51,"pathway":"Conditional Use","zones":"GC-1, NR","special_use":true,"stacking_cars":8},"collision":{"status":"restrictive","score":43,"pathway":"Special Use","zones":"GC-1","special_use":true},"autosales":{"status":"restrictive","score":45,"pathway":"Special Use","zones":"GC-1","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"North Shore. Very restrictive for auto uses.","population":28000},"Highland Park, IL":{"name":"Highland Park","state":"IL","composite":47,"factors":{"zoning":8,"process":9,"site":12,"competition":12,"political":6},"carwash":{"status":"restrictive","score":47,"pathway":"Special Use","zones":"B-5","special_use":true},"drivethru":{"status":"conditional","score":51,"pathway":"Conditional Use","zones":"B-3, B-5","special_use":true,"stacking_cars":8},"collision":{"status":"restrictive","score":43,"pathway":"Special Use","zones":"B-5, M-1","special_use":true},"autosales":{"status":"restrictive","score":45,"pathway":"Special Use","zones":"B-5","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":30000},"Deerfield, IL":{"name":"Deerfield","state":"IL","composite":57,"factors":{"zoning":8,"process":11,"site":14,"competition":13,"political":9},"carwash":{"status":"conditional","score":55,"pathway":"Special Use","zones":"C-2, C-3","special_use":true},"drivethru":{"status":"conditional","score":63,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":8},"collision":{"status":"conditional","score":53,"pathway":"Special Use","zones":"C-3, M-1","special_use":true},"autosales":{"status":"conditional","score":55,"pathway":"Special Use","zones":"C-3","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":19000},"Lake Forest, IL":{"name":"Lake Forest","state":"IL","composite":49,"factors":{"zoning":8,"process":9,"site":13,"competition":13,"political":6},"carwash":{"status":"restrictive","score":49,"pathway":"Special Use","zones":"GC-1","special_use":true},"drivethru":{"status":"conditional","score":53,"pathway":"Conditional Use","zones":"GC-1","special_use":true,"stacking_cars":8},"collision":{"status":"restrictive","score":45,"pathway":"Special Use","zones":"GC-1, LI","special_use":true},"autosales":{"status":"restrictive","score":45,"pathway":"Special Use","zones":"GC-1","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Very affluent. Strict design standards. Historic preservation.","population":19000},"Libertyville, IL":{"name":"Libertyville","state":"IL","composite":66,"factors":{"zoning":12,"process":12,"site":15,"competition":14,"political":13},"carwash":{"status":"likely_permitted","score":66,"pathway":"Conditional Use","zones":"B-3","special_use":true},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":64,"pathway":"Conditional Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"conditional","score":64,"pathway":"Conditional Use","zones":"B-3","special_use":true},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":20000},"Palos Hills, IL":{"name":"Palos Hills","state":"IL","composite":67,"factors":{"zoning":12,"process":12,"site":15,"competition":14,"political":13},"carwash":{"status":"likely_permitted","score":66,"pathway":"Conditional Use","zones":"C-2, C-3","special_use":true},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"C-2, C-3","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":64,"pathway":"Conditional Use","zones":"C-3, M-1","special_use":true},"autosales":{"status":"likely_permitted","score":66,"pathway":"Permitted","zones":"C-2, C-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":18000},"Darien, IL":{"name":"Darien","state":"IL","composite":67,"factors":{"zoning":12,"process":12,"site":15,"competition":14,"political":13},"carwash":{"status":"likely_permitted","score":66,"pathway":"Conditional Use","zones":"B-2, B-3","special_use":true},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":64,"pathway":"Conditional Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"likely_permitted","score":66,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":22000},"Hinsdale, IL":{"name":"Hinsdale","state":"IL","composite":47,"factors":{"zoning":8,"process":9,"site":13,"competition":13,"political":5},"carwash":{"status":"restrictive","score":48,"pathway":"Special Use","zones":"B-1, B-2","special_use":true},"drivethru":{"status":"conditional","score":52,"pathway":"Conditional Use","zones":"B-1, B-2","special_use":true,"stacking_cars":10},"collision":{"status":"restrictive","score":40,"pathway":"Prohibited","zones":"None","special_use":false},"autosales":{"status":"restrictive","score":46,"pathway":"Special Use","zones":"B-2","special_use":true},"requirements":{"stacking_cars":10,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":true,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Very affluent. No collision repair. 10-car stacking. Design review board.","population":17000},"Westmont, IL":{"name":"Westmont","state":"IL","composite":67,"factors":{"zoning":12,"process":12,"site":15,"competition":14,"political":13},"carwash":{"status":"likely_permitted","score":66,"pathway":"Conditional Use","zones":"B-2, B-3","special_use":true},"drivethru":{"status":"likely_permitted","score":70,"pathway":"Permitted","zones":"B-2, B-3","special_use":false,"stacking_cars":6},"collision":{"status":"conditional","score":64,"pathway":"Conditional Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"likely_permitted","score":66,"pathway":"Permitted","zones":"B-2, B-3","special_use":false},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":24000},"Cedarburg, WI":{"name":"Cedarburg","state":"WI","composite":63,"factors":{"zoning":8,"process":13,"site":14,"competition":14,"political":12},"carwash":{"status":"conditional","score":61,"pathway":"Special Use","zones":"B-2","special_use":true},"drivethru":{"status":"likely_permitted","score":65,"pathway":"Conditional Use","zones":"B-2","special_use":true,"stacking_cars":6},"collision":{"status":"conditional","score":63,"pathway":"Conditional Use","zones":"B-2, M-1","special_use":true},"autosales":{"status":"conditional","score":63,"pathway":"Conditional Use","zones":"B-2","special_use":true},"requirements":{"stacking_cars":6,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Historic downtown. Aesthetic concerns.","population":12000},"Barrington, IL":{"name":"Barrington","state":"IL","composite":54,"factors":{"zoning":8,"process":11,"site":14,"competition":14,"political":7},"carwash":{"status":"conditional","score":54,"pathway":"Special Use","zones":"B-3","special_use":true},"drivethru":{"status":"conditional","score":56,"pathway":"Conditional Use","zones":"B-3","special_use":true,"stacking_cars":8},"collision":{"status":"conditional","score":52,"pathway":"Special Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"conditional","score":54,"pathway":"Special Use","zones":"B-3","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Affluent. Community character concerns.","population":10000},"Glencoe, IL":{"name":"Glencoe","state":"IL","composite":48,"factors":{"zoning":8,"process":10,"site":13,"competition":14,"political":6},"carwash":{"status":"conditional","score":51,"pathway":"Special Use","zones":"C-Comm","special_use":true},"drivethru":{"status":"conditional","score":51,"pathway":"Special Use","zones":"C-Comm","special_use":true,"stacking_cars":8},"collision":{"status":"restrictive","score":43,"pathway":"Prohibited","zones":"None","special_use":false},"autosales":{"status":"restrictive","score":43,"pathway":"Prohibited","zones":"None","special_use":false},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Very affluent North Shore. Auto uses extremely restricted.","population":9000},"Winnetka, IL":{"name":"Winnetka","state":"IL","composite":44,"factors":{"zoning":8,"process":9,"site":12,"competition":13,"political":5},"carwash":{"status":"restrictive","score":47,"pathway":"Special Use","zones":"C-Comm","special_use":true},"drivethru":{"status":"restrictive","score":47,"pathway":"Special Use","zones":"C-Comm","special_use":true,"stacking_cars":8},"collision":{"status":"restrictive","score":39,"pathway":"Prohibited","zones":"None","special_use":false},"autosales":{"status":"restrictive","score":39,"pathway":"Prohibited","zones":"None","special_use":false},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":true,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Extremely affluent. Auto uses extremely restricted.","population":12000},"Clarendon Hills, IL":{"name":"Clarendon Hills","state":"IL","composite":62,"factors":{"zoning":8,"process":12,"site":15,"competition":15,"political":11},"carwash":{"status":"conditional","score":61,"pathway":"Special Use","zones":"B-1","special_use":true},"drivethru":{"status":"likely_permitted","score":65,"pathway":"Conditional Use","zones":"B-1","special_use":true,"stacking_cars":8},"collision":{"status":"conditional","score":59,"pathway":"Special Use","zones":"B-1, M-1","special_use":true},"autosales":{"status":"conditional","score":61,"pathway":"Special Use","zones":"B-1","special_use":true},"requirements":{"stacking_cars":8,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"","population":9000},"Naperville, IL":{"name":"Naperville","state":"IL","composite":35,"factors":{"zoning":10,"process":6,"site":10,"competition":8,"political":4},"carwash":{"status":"restrictive","score":38,"pathway":"Conditional Use","zones":"B-3 only","special_use":true},"drivethru":{"status":"restrictive","score":34,"pathway":"Special Use","zones":"B-3 only (B-2 = Special Use)","special_use":true,"stacking_cars":10},"collision":{"status":"restrictive","score":36,"pathway":"Special Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"restrictive","score":38,"pathway":"Conditional Use","zones":"B-3, B-4","special_use":true},"requirements":{"stacking_cars":10,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":true,"moratorium":false,"zoning_map_url":"https://www.naperville.il.us/maps","confidence":"High","verified":true,"override_reason":"Ground truth: Dutch Bros DENIED on Napier Blvd. 7 Brew at 1203 Iroquois only w/ extensive conditions.","notes":"Ground truth: Dutch Bros DENIED on Napier Blvd.","population":149000},"Schaumburg, IL":{"name":"Schaumburg","state":"IL","composite":49,"factors":{"zoning":12,"process":8,"site":12,"competition":10,"political":9},"carwash":{"status":"conditional","score":51,"pathway":"Conditional Use","zones":"B-2, B-3","special_use":true},"drivethru":{"status":"restrictive","score":47,"pathway":"Special Use","zones":"B-3 only","special_use":true,"stacking_cars":10},"collision":{"status":"restrictive","score":47,"pathway":"Special Use","zones":"B-3, M-1","special_use":true},"autosales":{"status":"restrictive","score":49,"pathway":"Conditional Use","zones":"B-2, B-3","special_use":true},"requirements":{"stacking_cars":10,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":true,"moratorium":false,"zoning_map_url":"https://www.schaumburg.com/maps","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"10-car stacking. Auto uses face extra scrutiny.","population":74000},"Kenilworth, IL":{"name":"Kenilworth","state":"IL","composite":41,"factors":{"zoning":0,"process":9,"site":12,"competition":16,"political":4},"carwash":{"status":"restrictive","score":41,"pathway":"Prohibited","zones":"None","special_use":false},"drivethru":{"status":"restrictive","score":41,"pathway":"Prohibited","zones":"None","special_use":false,"stacking_cars":null},"collision":{"status":"restrictive","score":41,"pathway":"Prohibited","zones":"None","special_use":false},"autosales":{"status":"restrictive","score":41,"pathway":"Prohibited","zones":"None","special_use":false},"requirements":{"stacking_cars":null,"lot_size_sqft":null,"front_setback_ft":null},"stacking_issue":false,"moratorium":false,"zoning_map_url":"","confidence":"AI Estimate","verified":false,"override_reason":"","notes":"Exclusively residential village. No commercial zones.","population":2500}}/*ZONING_DATA_END*/;
+
+// ============================================================
+// STATE CONFIG
+// ============================================================
+const STATES = [
+  {fips:'01',abbr:'AL',name:'Alabama'},{fips:'02',abbr:'AK',name:'Alaska'},{fips:'04',abbr:'AZ',name:'Arizona'},
+  {fips:'05',abbr:'AR',name:'Arkansas'},{fips:'06',abbr:'CA',name:'California'},{fips:'08',abbr:'CO',name:'Colorado'},
+  {fips:'09',abbr:'CT',name:'Connecticut'},{fips:'10',abbr:'DE',name:'Delaware'},{fips:'11',abbr:'DC',name:'District of Columbia'},
+  {fips:'12',abbr:'FL',name:'Florida'},{fips:'13',abbr:'GA',name:'Georgia'},{fips:'15',abbr:'HI',name:'Hawaii'},
+  {fips:'16',abbr:'ID',name:'Idaho'},{fips:'17',abbr:'IL',name:'Illinois'},{fips:'18',abbr:'IN',name:'Indiana'},
+  {fips:'19',abbr:'IA',name:'Iowa'},{fips:'20',abbr:'KS',name:'Kansas'},{fips:'21',abbr:'KY',name:'Kentucky'},
+  {fips:'22',abbr:'LA',name:'Louisiana'},{fips:'23',abbr:'ME',name:'Maine'},{fips:'24',abbr:'MD',name:'Maryland'},
+  {fips:'25',abbr:'MA',name:'Massachusetts'},{fips:'26',abbr:'MI',name:'Michigan'},{fips:'27',abbr:'MN',name:'Minnesota'},
+  {fips:'28',abbr:'MS',name:'Mississippi'},{fips:'29',abbr:'MO',name:'Missouri'},{fips:'30',abbr:'MT',name:'Montana'},
+  {fips:'31',abbr:'NE',name:'Nebraska'},{fips:'32',abbr:'NV',name:'Nevada'},{fips:'33',abbr:'NH',name:'New Hampshire'},
+  {fips:'34',abbr:'NJ',name:'New Jersey'},{fips:'35',abbr:'NM',name:'New Mexico'},{fips:'36',abbr:'NY',name:'New York'},
+  {fips:'37',abbr:'NC',name:'North Carolina'},{fips:'38',abbr:'ND',name:'North Dakota'},{fips:'39',abbr:'OH',name:'Ohio'},
+  {fips:'40',abbr:'OK',name:'Oklahoma'},{fips:'41',abbr:'OR',name:'Oregon'},{fips:'42',abbr:'PA',name:'Pennsylvania'},
+  {fips:'44',abbr:'RI',name:'Rhode Island'},{fips:'45',abbr:'SC',name:'South Carolina'},{fips:'46',abbr:'SD',name:'South Dakota'},
+  {fips:'47',abbr:'TN',name:'Tennessee'},{fips:'48',abbr:'TX',name:'Texas'},{fips:'49',abbr:'UT',name:'Utah'},
+  {fips:'50',abbr:'VT',name:'Vermont'},{fips:'51',abbr:'VA',name:'Virginia'},{fips:'53',abbr:'WA',name:'Washington'},
+  {fips:'54',abbr:'WV',name:'West Virginia'},{fips:'55',abbr:'WI',name:'Wisconsin'},{fips:'56',abbr:'WY',name:'Wyoming'}
+];
+
+const STATE_ABBR = {};
+STATES.forEach(s => STATE_ABBR[s.fips] = s.abbr);
+
+// Census TIGERweb ArcGIS REST API for incorporated places
+// Primary: Places_CouSub_ConCity_SubMCD service, Layer 4 = Incorporated Places
+const TIGER_ENDPOINTS = [
+  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/4/query',
+  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/26/query',
+  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/26/query'
+];
+let TIGER_BASE = TIGER_ENDPOINTS[0];
+
+// ============================================================
+// APP STATE
+// ============================================================
+let currentLayer = 'carwash';
+const LAYER_LABELS = { carwash: 'Car Wash', drivethru: 'Drive-Thru', collision: 'Collision Repair', autosales: 'Auto Sales' };
+let showCompetitors = false;
+let competitorLayer = null;
+let competitorCache = {};
+let competitorLoading = false;
+let allFeatures = [];
+let geoLayer = null;
+let map = null;
+
+// ============================================================
+// SCORING & COLORS
+// ============================================================
+function getScore(feature) {
+  const key = feature.properties._zoningKey;
+  const zd = ZONING_DATA[key];
+  if (!zd) return null;
+  return zd[currentLayer] ? zd[currentLayer].score : null;
+}
+
+function scoreToColor(score) {
+  if (score === null || score === undefined) return '#4a5568';
+  if (score >= 80) return '#22c55e';
+  if (score >= 65) return '#86efac';
+  if (score >= 50) return '#facc15';
+  if (score >= 30) return '#f97316';
+  return '#ef4444';
+}
+
+function scoreToLabel(score) {
+  if (score === null || score === undefined) return 'Unresearched';
+  if (score >= 80) return 'Low friction';
+  if (score >= 65) return 'Moderate friction';
+  if (score >= 50) return 'Significant friction';
+  if (score >= 30) return 'High friction';
+  return 'Prohibitive';
+}
+
+function getLayerScore(zd) {
+  if (!zd) return null;
+  // v2 schema has composite + per-layer scores
+  if (zd[currentLayer] && zd[currentLayer].score !== undefined) return zd[currentLayer].score;
+  if (zd.composite !== undefined) return zd.composite;
+  return null;
+}
+
+// ============================================================
+// AUTO-ESTIMATION ENGINE
+// Generates zoning estimates for unresearched municipalities
+// using population tier + state-level zoning patterns
+// ============================================================
+function estimateZoning(pop, stateFp) {
+  // Friction-adjusted institutional scoring — mirrors Python v5 model
+  // 5 factors each 0-20: Zoning, Process, Site, Competition, Political
+  // State friction: higher = more bureaucratic process and political friction
+  // Based on regulatory environment, zoning tradition, CEQA/SEPA type laws
+  const STATE_FRICTION_MAP = {
+    // Very high friction — heavy regulation, environmental review, strong local control
+    '06':{process:5,political:4}, // CA — CEQA, coastal commission, massive process
+    '36':{process:4,political:3}, // NY — complex zoning, community boards
+    '25':{process:4,political:3}, // MA — strong home rule, ZBA tradition
+    '34':{process:4,political:3}, // NJ — heavy regulation, multiple review layers
+    '09':{process:4,political:3}, // CT — strong town government, restrictive zoning
+    // High friction
+    '17':{process:3,political:2}, // IL — bureaucratic, aldermanic tradition
+    '42':{process:3,political:2}, // PA — complex municipal structure
+    '24':{process:3,political:2}, // MD — environmental review, county power
+    '51':{process:3,political:2}, // VA — Dillon Rule limits but local review heavy
+    '41':{process:3,political:3}, // OR — land use planning, UGB restrictions
+    '53':{process:3,political:3}, // WA — GMA, environmental review (SEPA)
+    '33':{process:3,political:2}, // NH — strong local control
+    '50':{process:3,political:2}, // VT — Act 250, environmental review
+    '44':{process:3,political:2}, // RI — dense, limited space
+    '10':{process:3,political:2}, // DE — small state, moderate regulation
+    '15':{process:3,political:3}, // HI — complex permitting, land use commission
+    '11':{process:4,political:3}, // DC — heavy zoning, historic preservation
+    // Moderate friction
+    '55':{process:1,political:1}, // WI
+    '26':{process:2,political:1}, // MI
+    '27':{process:2,political:1}, // MN
+    '39':{process:2,political:1}, // OH
+    '08':{process:2,political:2}, // CO — growing regulation, some cities very restrictive
+    '23':{process:2,political:1}, // ME
+    '37':{process:1,political:1}, // NC
+    '13':{process:1,political:1}, // GA
+    '12':{process:1,political:1}, // FL — fast permitting but some coastal friction
+    '54':{process:1,political:0}, // WV
+    '21':{process:1,political:0}, // KY
+    '47':{process:1,political:0}, // TN
+    '29':{process:1,political:0}, // MO
+    '19':{process:1,political:0}, // IA
+    '31':{process:1,political:0}, // NE
+    '46':{process:1,political:0}, // SD
+    '38':{process:1,political:0}, // ND
+    '30':{process:1,political:0}, // MT
+    '56':{process:0,political:0}, // WY
+    '16':{process:0,political:0}, // ID
+    '49':{process:0,political:0}, // UT
+    '32':{process:1,political:0}, // NV
+    '04':{process:1,political:0}, // AZ — pro-development
+    '35':{process:1,political:0}, // NM
+    // Low friction — business-friendly, minimal regulatory burden
+    '48':{process:0,political:0}, // TX — no state zoning, very permissive
+    '18':{process:0,political:0}, // IN
+    '01':{process:0,political:0}, // AL
+    '28':{process:0,political:0}, // MS
+    '05':{process:0,political:0}, // AR
+    '22':{process:0,political:0}, // LA
+    '40':{process:0,political:0}, // OK
+    '20':{process:0,political:0}, // KS
+    '45':{process:0,political:0}, // SC
+    '02':{process:0,political:0}, // AK
+  };
+  const sf = STATE_FRICTION_MAP[stateFp] || { process: 1, political: 1 };
+
+  // Population friction penalties
+  let pp, sp, cp, plp;
+  if (pop >= 500000)      { pp=6; sp=5; cp=7; plp=5; }
+  else if (pop >= 200000) { pp=5; sp=4; cp=6; plp=4; }
+  else if (pop >= 100000) { pp=4; sp=4; cp=5; plp=3; }
+  else if (pop >= 50000)  { pp=3; sp=3; cp=4; plp=3; }
+  else if (pop >= 25000)  { pp=2; sp=2; cp=3; plp=2; }
+  else if (pop >= 10000)  { pp=1; sp=1; cp=2; plp=1; }
+  else if (pop >= 5000)   { pp=0; sp=0; cp=1; plp=0; }
+  else                    { pp=0; sp=0; cp=0; plp=0; }
+
+  // Raw zoning permissiveness by pop tier (CW > DT > AS > CR typically)
+  let cwZ, dtZ, crZ, asZ;
+  if (pop >= 200000)      { cwZ=12; dtZ=10; crZ=8;  asZ=8;  }
+  else if (pop >= 100000) { cwZ=14; dtZ=12; crZ=10; asZ=10; }
+  else if (pop >= 50000)  { cwZ=15; dtZ=14; crZ=11; asZ=12; }
+  else if (pop >= 25000)  { cwZ=16; dtZ=15; crZ=13; asZ=14; }
+  else if (pop >= 10000)  { cwZ=17; dtZ=16; crZ=15; asZ=16; }
+  else if (pop >= 5000)   { cwZ=18; dtZ=17; crZ=16; asZ=17; }
+  else                    { cwZ=18; dtZ=18; crZ=17; asZ=18; }
+
+  const cl = (v) => Math.max(0, Math.min(20, v));
+  const fProc = cl(16 - pp - sf.process);
+  const fSite = cl(16 - sp);
+  const fComp = cl(16 - cp);
+  const fPol = cl(16 - plp - sf.political);
+
+  const mkScore = (zRaw) => zRaw + fProc + fSite + fComp + fPol;
+  const cwS = mkScore(cwZ), dtS = mkScore(dtZ), crS = mkScore(crZ), asS = mkScore(asZ);
+  const composite = Math.round(cwS*0.3 + dtS*0.3 + crS*0.2 + asS*0.2);
+
+  const pw = (s) => s >= 75 ? 'Likely Permitted' : s >= 55 ? 'Likely Conditional' : s >= 35 ? 'Likely Special Use' : 'Likely Restricted';
+  const dtStacking = (pop >= 25000 && stateFp === '17') ? 10 : (pop >= 50000) ? 8 : null;
+
+  return {
+    composite, confidence: 'AI Estimate', population: pop || null,
+    factors: { zoning: cwZ, process: fProc, site: fSite, competition: fComp, political: fPol },
+    carwash: { score: cwS, pathway: pw(cwS), zones: 'Estimate \u2014 verify locally', special_use: cwS < 50 },
+    drivethru: { score: dtS, pathway: pw(dtS), zones: 'Estimate \u2014 verify locally', special_use: dtS < 50, stacking_cars: dtStacking },
+    collision: { score: crS, pathway: pw(crS), zones: 'Estimate \u2014 verify locally', special_use: crS < 50 },
+    autosales: { score: asS, pathway: pw(asS), zones: 'Estimate \u2014 verify locally', special_use: asS < 50 },
+    stacking_issue: dtStacking !== null && dtStacking >= 8,
+    moratorium: false,
+    requirements: { stacking_cars: dtStacking, lot_size_sqft: null, front_setback_ft: null },
+    notes: 'Auto-estimated from population & state patterns. Verify with municipal zoning code.',
+    _estimated: true
+  };
+}
+
+// Get zoning data for a feature — researched or estimated
+function getZoningData(feature) {
+  const key = feature.properties._zoningKey;
+  const zd = ZONING_DATA[key];
+  if (zd) return zd;
+  // Auto-estimate from Census population
+  const pop = feature.properties.POP100 || feature.properties.POPULATION || 0;
+  const stateFp = feature.properties.STATEFP || feature.properties.STATE || '17';
+  return estimateZoning(pop, stateFp);
+}
+
+function featureStyle(feature) {
+  const key = feature.properties._zoningKey;
+  const zd = ZONING_DATA[key];
+  const zdAny = zd || getZoningData(feature);
+  const score = getLayerScore(zdAny);
+  const color = scoreToColor(score);
+  const isResearched = !!zd;
+  const isVerified = isResearched && zd.confidence !== 'AI Estimate';
+  const isEstimate = !isResearched || (zd && zd.confidence === 'AI Estimate');
+
+  return {
+    fillColor: color,
+    color: '#1a2a4e',
+    weight: 1,
+    fillOpacity: isVerified ? 0.6 : (isResearched ? 0.45 : 0.3),
+    opacity: 0.8,
+    dashArray: isEstimate ? '4 4' : null
+  };
+}
+
+// ============================================================
+// POPUPS
+// ============================================================
+function factorBar(label, value, max) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  const color = pct >= 75 ? '#22c55e' : pct >= 50 ? '#facc15' : pct >= 25 ? '#f97316' : '#ef4444';
+  return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+    <span style="width:70px;font-size:11px;color:#99a;">${label}</span>
+    <div style="flex:1;height:8px;background:#1a2a3e;border-radius:4px;overflow:hidden;">
+      <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;"></div>
+    </div>
+    <span style="width:28px;font-size:11px;color:#ccc;text-align:right;">${value}/${max}</span>
+  </div>`;
+}
+
+// ============================================================
+// ZONING INTEL — live news + council minutes search
+// ============================================================
+const intelCache = {};
+
+async function fetchZoningIntel(cityName, stateAbbr, useType, elementId) {
+  const cacheKey = `${cityName}_${stateAbbr}_${useType}`;
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  if (intelCache[cacheKey]) {
+    el.innerHTML = intelCache[cacheKey];
+    return;
+  }
+
+  try {
+    // Google News RSS via a public RSS-to-JSON service
+    const newsQuery = encodeURIComponent(`"${cityName}" ${stateAbbr} zoning ${useType.toLowerCase()}`);
+    const councilQuery = encodeURIComponent(`"${cityName}" ${stateAbbr} city council zoning ordinance`);
+
+    // Fetch news and council results in parallel
+    const [newsResp, councilResp] = await Promise.allSettled([
+      fetch(`https://news.google.com/rss/search?q=${newsQuery}&hl=en-US&gl=US&ceid=US:en`).then(r => r.text()),
+      fetch(`https://news.google.com/rss/search?q=${councilQuery}&hl=en-US&gl=US&ceid=US:en`).then(r => r.text())
+    ]);
+
+    let html = '';
+    const allItems = [];
+
+    // Parse RSS XML for news items
+    function parseRSS(xmlText, tag) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, 'text/xml');
+      const items = doc.querySelectorAll('item');
+      const results = [];
+      items.forEach((item, i) => {
+        if (i >= 3) return;
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '';
+        const pubDate = item.querySelector('pubDate')?.textContent || '';
+        const source = item.querySelector('source')?.textContent || '';
+        results.push({ title, link, pubDate, source, tag });
+      });
+      return results;
+    }
+
+    if (newsResp.status === 'fulfilled') {
+      allItems.push(...parseRSS(newsResp.value, 'news'));
+    }
+    if (councilResp.status === 'fulfilled') {
+      const councilItems = parseRSS(councilResp.value, 'council');
+      // Deduplicate by title
+      const existingTitles = new Set(allItems.map(i => i.title.toLowerCase()));
+      councilItems.forEach(i => {
+        if (!existingTitles.has(i.title.toLowerCase())) allItems.push(i);
+      });
+    }
+
+    if (allItems.length === 0) {
+      html = '<div style="color:#667;font-style:italic;">No recent zoning news found for this municipality.</div>';
+    } else {
+      // Show up to 5 results
+      allItems.slice(0, 5).forEach(item => {
+        const date = item.pubDate ? new Date(item.pubDate) : null;
+        const dateStr = date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        const tagColor = item.tag === 'council' ? '#86efac' : '#60a5fa';
+        const tagLabel = item.tag === 'council' ? 'Council' : 'News';
+        html += `<div style="margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid #1a2a4e;">`;
+        html += `<a href="${item.link}" target="_blank" style="color:#e0e0e0;font-size:11px;line-height:1.4;text-decoration:none;font-weight:500;">${item.title}</a>`;
+        html += `<div style="display:flex;gap:6px;align-items:center;margin-top:2px;">`;
+        html += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${tagColor}22;color:${tagColor};font-weight:600;">${tagLabel}</span>`;
+        if (item.source) html += `<span style="font-size:9px;color:#667;">${item.source}</span>`;
+        if (dateStr) html += `<span style="font-size:9px;color:#556;">${dateStr}</span>`;
+        html += `</div></div>`;
+      });
+    }
+
+    // Ordinance tracking status
+    html += `<div style="margin-top:6px;padding:5px 8px;background:#1a2a4e;border-radius:5px;font-size:10px;color:#7faacc;display:flex;align-items:center;gap:6px;">`;
+    html += `<span style="color:#22c55e;font-size:14px;">\u25CF</span>`;
+    html += `<span>Ordinance monitoring active \u2014 checked weekly</span>`;
+    html += `</div>`;
+
+    intelCache[cacheKey] = html;
+    el.innerHTML = html;
+  } catch (err) {
+    console.error('[EasyZ] Intel fetch failed:', err);
+    el.innerHTML = '<div style="color:#667;">Could not load intel. Use the search links below.</div>';
+  }
+}
+
+function onFeatureClick(e) {
+  const props = e.target.feature.properties;
+  const key = props._zoningKey;
+  const zdResearched = ZONING_DATA[key];
+  const zd = zdResearched || getZoningData(e.target.feature);
+  const name = props.NAME || props.BASENAME || props.FULLNAME || 'Unknown';
+  const state = STATE_ABBR[props.STATEFP || props.STATE] || props._zoningKey?.split(', ')[1] || '';
+  const isEstimated = !zdResearched || zd._estimated;
+
+  // Determine active layer
+  const layerLabel = LAYER_LABELS[currentLayer] || currentLayer;
+  const useData = zd[currentLayer];
+
+  let html = `<div class="popup-title">${name}, ${state}</div>`;
+
+  const layerScore = useData ? useData.score : (zd.composite || 0);
+  const scoreColor = scoreToColor(layerScore);
+  const conf = zd.confidence || 'Unknown';
+  const confColor = conf === 'High' ? '#22c55e' : conf === 'Medium' ? '#facc15' : conf === 'AI Estimate' ? '#f97316' : '#888';
+  const confLabel = conf === 'AI Estimate' ? '\u26A0 AI Estimate' : conf;
+
+  // Header: layer label + score
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0;">`;
+  html += `<div>`;
+  html += `<div style="font-size:13px;font-weight:700;color:#cdd;">${layerLabel} Zoning</div>`;
+  const pop = zd.population || props.POP100 || null;
+  html += `<span style="font-size:11px;color:#889;">${pop ? Number(pop).toLocaleString() + ' pop' : ''}</span>`;
+  html += `</div>`;
+  html += `<span style="font-size:26px;font-weight:800;color:${scoreColor};">${layerScore}<span style="font-size:14px;color:#667;">/100</span></span>`;
+  html += `</div>`;
+
+  // Confidence badge
+  html += `<div style="text-align:right;margin-bottom:6px;"><span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${confColor}22;color:${confColor};">${confLabel}</span></div>`;
+
+  // Estimated data banner
+  if (isEstimated) {
+    html += `<div style="background:#1e3a5f;color:#60a5fa;padding:5px 8px;border-radius:5px;margin:4px 0;font-size:11px;text-align:center;border:1px dashed #3b82f6;">Auto-estimated \u2014 needs field verification</div>`;
+  }
+
+  // Special Use Permit badge (prominent)
+  if (useData && useData.special_use) {
+    html += `<div style="background:#7f1d1d;color:#fca5a5;padding:6px 10px;border-radius:6px;margin:6px 0;font-size:12px;font-weight:700;text-align:center;">\u26A0 SPECIAL USE PERMIT REQUIRED</div>`;
+  }
+
+  // Approval pathway + zones
+  if (useData) {
+    const pathway = useData.pathway || 'Unknown';
+    const pathColor = pathway.includes('Permitted') ? '#22c55e' : pathway.includes('Conditional') ? '#facc15' : pathway.includes('Special') ? '#f97316' : pathway.includes('Prohibited') || pathway.includes('Restricted') ? '#ef4444' : '#889';
+    html += `<div style="margin:6px 0;">`;
+    html += `<div class="popup-row"><span class="popup-label">Pathway</span><span class="popup-value" style="color:${pathColor};font-weight:600;">${pathway}</span></div>`;
+    if (useData.zones) {
+      html += `<div class="popup-row"><span class="popup-label">Zones</span><span class="popup-value" style="color:#7faacc;">${useData.zones}</span></div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Stacking requirement
+  const stacking = useData && useData.stacking_cars ? useData.stacking_cars : (zd.requirements && zd.requirements.stacking_cars ? zd.requirements.stacking_cars : null);
+  if (stacking) {
+    const stackColor = stacking >= 10 ? '#ef4444' : stacking >= 8 ? '#f97316' : '#facc15';
+    html += `<div class="popup-row"><span class="popup-label">Stacking</span><span class="popup-value" style="color:${stackColor};font-weight:600;">${stacking}-car minimum queue</span></div>`;
+  }
+
+  // Site requirements
+  if (zd.requirements) {
+    const r = zd.requirements;
+    const reqParts = [];
+    if (r.lot_size_sqft) reqParts.push(`${r.lot_size_sqft.toLocaleString()} sf lot min`);
+    if (r.front_setback_ft) reqParts.push(`${r.front_setback_ft}ft front setback`);
+    if (reqParts.length > 0) {
+      html += `<div style="font-size:11px;color:#7faacc;margin:4px 0;">Site: ${reqParts.join(' \u00B7 ')}</div>`;
+    }
+  }
+
+  html += `<hr class="popup-divider">`;
+
+  // 5-Factor breakdown
+  if (zd.factors) {
+    html += `<div style="margin:4px 0;">`;
+    html += factorBar('Zoning', zd.factors.zoning || 0, 20);
+    html += factorBar('Process', zd.factors.process || zd.factors.site_req || 0, 20);
+    html += factorBar('Site', zd.factors.site || zd.factors.approval || 0, 20);
+    html += factorBar('Compete', zd.factors.competition || zd.factors.saturation || 0, 20);
+    html += factorBar('Political', zd.factors.political || 0, 20);
+    html += `</div>`;
+  }
+
+  // Warnings
+  if (zd.stacking_issue) {
+    html += `<div class="popup-badge" style="background:#7f1d1d;color:#fca5a5;margin-top:6px;">\u26A0 Stacking Restrictions</div>`;
+  }
+  if (zd.moratorium) {
+    html += `<div class="popup-badge" style="background:#7f1d1d;color:#fca5a5;margin-top:4px;">\u26A0 Active Moratorium</div>`;
+  }
+
+  // Notes / override reason
+  if (zd.override_reason) {
+    html += `<hr class="popup-divider">`;
+    html += `<div style="font-size:11px;color:#e94560;font-style:italic;">${zd.override_reason}</div>`;
+  } else if (zd.notes && !isEstimated) {
+    html += `<hr class="popup-divider">`;
+    html += `<div style="font-size:11px;color:#889;">${zd.notes}</div>`;
+  }
+
+  // Zoning map link
+  if (zd.zoning_map_url) {
+    html += `<div style="margin-top:6px;text-align:center;"><a href="${zd.zoning_map_url}" target="_blank" style="font-size:11px;color:#60a5fa;text-decoration:underline;">\uD83D\uDDFA View Municipal Zoning Map</a></div>`;
+  }
+
+  // Zoning Intel section — news, council minutes, ordinance checks
+  const intelId = 'intel-' + Date.now();
+  html += `<hr class="popup-divider">`;
+  html += `<div style="margin-top:6px;">`;
+  html += `<div style="font-size:12px;font-weight:700;color:#e94560;margin-bottom:6px;">\uD83D\uDCE1 Zoning Intel</div>`;
+  html += `<div id="${intelId}" style="font-size:11px;color:#889;">Loading news &amp; council activity...</div>`;
+  html += `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">`;
+  // Quick search links
+  const gNewsQ = encodeURIComponent(`"${name}" ${state} zoning ${layerLabel.toLowerCase()}`);
+  const councilQ = encodeURIComponent(`"${name}" ${state} city council minutes zoning`);
+  const ordQ = encodeURIComponent(`"${name}" ${state} zoning ordinance amendment`);
+  html += `<a href="https://www.google.com/search?q=${gNewsQ}&tbm=nws&tbs=qdr:m" target="_blank" style="font-size:10px;color:#0f1a2e;background:#60a5fa;padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:600;">News</a>`;
+  html += `<a href="https://www.google.com/search?q=${councilQ}&tbs=qdr:m3" target="_blank" style="font-size:10px;color:#0f1a2e;background:#86efac;padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:600;">Council Minutes</a>`;
+  html += `<a href="https://www.google.com/search?q=${ordQ}&tbs=qdr:y" target="_blank" style="font-size:10px;color:#0f1a2e;background:#facc15;padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:600;">Ordinances</a>`;
+  html += `</div></div>`;
+
+  L.popup({ maxWidth: 400, className: '' })
+    .setLatLng(e.latlng)
+    .setContent(html)
+    .openOn(map);
+
+  // Async: fetch zoning news for this municipality
+  fetchZoningIntel(name, state, layerLabel, intelId);
+}
+
+function onFeatureHover(e) {
+  const layer = e.target;
+  const key = layer.feature.properties._zoningKey;
+  const zdResearched = ZONING_DATA[key];
+  const zdAny = zdResearched || getZoningData(layer.feature);
+  layer.setStyle({ weight: 3, color: '#e94560', fillOpacity: zdResearched ? 0.75 : 0.45 });
+  layer.bringToFront();
+}
+
+function onFeatureOut(e) {
+  geoLayer.resetStyle(e.target);
+}
+
+// ============================================================
+// MAP INIT
+// ============================================================
+let currentBasemap = null;
+const basemaps = {};
+
+function initMap() {
+  map = L.map('map', {
+    center: [39.5, -98.5],
+    zoom: 5,
+    preferCanvas: true,
+    zoomControl: true
+  });
+
+  // Custom pane for competitor markers — sits above polygons so hover events work
+  map.createPane('competitorPane');
+  map.getPane('competitorPane').style.zIndex = 650;
+  map.getPane('competitorPane').style.pointerEvents = 'auto';
+
+  // Dark basemap (default) — clean dark theme, labels included
+  basemaps.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CARTO &copy; OSM',
+    maxZoom: 20,
+    subdomains: 'abcd'
+  });
+
+  // Streets basemap — full road names and labels, light theme
+  basemaps.streets = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CARTO &copy; OSM',
+    maxZoom: 20,
+    subdomains: 'abcd'
+  });
+
+  // Satellite basemap — Esri World Imagery (aerial photos)
+  basemaps.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+    maxZoom: 19
+  });
+
+  // Satellite labels overlay — road names + place names on top of satellite
+  basemaps.satelliteLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+    attribution: '',
+    maxZoom: 20,
+    subdomains: 'abcd',
+    pane: 'overlayPane'
+  });
+
+  // Start with dark
+  currentBasemap = basemaps.dark;
+  currentBasemap.addTo(map);
+}
+
+function setBasemap(name) {
+  // Remove current basemap
+  if (currentBasemap) map.removeLayer(currentBasemap);
+  if (basemaps.satelliteLabels) map.removeLayer(basemaps.satelliteLabels);
+
+  // Set new basemap
+  currentBasemap = basemaps[name];
+  currentBasemap.addTo(map);
+
+  // Add labels overlay for satellite mode
+  if (name === 'satellite') {
+    basemaps.satelliteLabels.addTo(map);
+  }
+
+  // Re-add geoLayer on top so polygons render above basemap
+  if (geoLayer) {
+    geoLayer.bringToFront();
+  }
+
+  // Update UI buttons
+  document.getElementById('basemap-dark').classList.toggle('active', name === 'dark');
+  document.getElementById('basemap-streets').classList.toggle('active', name === 'streets');
+  document.getElementById('basemap-satellite').classList.toggle('active', name === 'satellite');
+
+  // Adjust polygon opacity for readability on different basemaps
+  if (name === 'satellite' || name === 'streets') {
+    document.documentElement.style.setProperty('--poly-opacity', '0.65');
+  } else {
+    document.documentElement.style.setProperty('--poly-opacity', '0.55');
+  }
+}
+
+// ============================================================
+// DATA LOADING (Census TIGERweb REST API)
+// ============================================================
+async function fetchStatePlaces(fips, abbr) {
+  const features = [];
+  let offset = 0;
+  const batchSize = 1000;
+  const maxRetries = 2;
+
+  while (true) {
+    // Use wildcard fields to handle different field name conventions across services
+    const params = new URLSearchParams({
+      where: `STATE='${fips}'`,
+      outFields: '*',
+      f: 'geojson',
+      returnGeometry: 'true',
+      resultRecordCount: batchSize.toString(),
+      resultOffset: offset.toString(),
+      outSR: '4326'
+    });
+
+    let data = null;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const url = `${TIGER_BASE}?${params}`;
+        console.log(`[EasyZ] Fetching: ${url.substring(0, 120)}...`);
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const text = await resp.text();
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          console.error(`[EasyZ] JSON parse failed for ${abbr}, offset ${offset}:`, text.substring(0, 200));
+          throw new Error('Invalid JSON response');
+        }
+        if (data.error) {
+          console.error(`[EasyZ] API error for ${abbr}:`, data.error);
+          throw new Error(`API error: ${data.error.message || JSON.stringify(data.error)}`);
+        }
+        break;
+      } catch (err) {
+        console.warn(`[EasyZ] Attempt ${attempt + 1} failed for ${abbr}:`, err.message);
+        if (attempt === maxRetries - 1) throw err;
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+      }
+    }
+
+    if (!data || !data.features || data.features.length === 0) {
+      console.log(`[EasyZ] ${abbr}: No more features at offset ${offset}`);
+      break;
+    }
+
+    console.log(`[EasyZ] ${abbr}: Got ${data.features.length} features at offset ${offset}`);
+
+    // Log first feature's property keys for debugging
+    if (offset === 0 && data.features.length > 0) {
+      const sampleProps = data.features[0].properties;
+      console.log(`[EasyZ] ${abbr} sample fields:`, Object.keys(sampleProps));
+      console.log(`[EasyZ] ${abbr} sample feature:`, JSON.stringify(sampleProps).substring(0, 300));
+    }
+
+    // Add zoning lookup key to each feature
+    for (const f of data.features) {
+      const props = f.properties;
+      const name = props.NAME || props.BASENAME || props.FULLNAME || '';
+      const statefp = props.STATEFP || props.STATE || fips;
+      // Ensure STATE_ABBR has this FIPS
+      props.STATEFP = statefp;
+
+      // Clean up name: remove " city", " village", " town" suffixes for matching
+      const cleanName = name
+        .replace(/ city$/i, '')
+        .replace(/ village$/i, '')
+        .replace(/ town$/i, '')
+        .replace(/ CDP$/i, '')
+        .trim();
+      f.properties._zoningKey = `${cleanName}, ${abbr}`;
+      // Also try original name if clean name didn't match
+      if (!ZONING_DATA[f.properties._zoningKey]) {
+        f.properties._zoningKey = `${name}, ${abbr}`;
+      }
+    }
+
+    features.push(...data.features);
+
+    if (data.features.length < batchSize) break;
+    offset += batchSize;
+  }
+
+  return features;
+}
+
+async function loadAllBoundaries() {
+  const progressFill = document.getElementById('progress-fill');
+  const statusText = document.getElementById('loading-status');
+  const loadedFeatures = [];
+
+  // Try each endpoint until one works for the first state
+  let endpointWorked = false;
+  for (let ep = 0; ep < TIGER_ENDPOINTS.length && !endpointWorked; ep++) {
+    TIGER_BASE = TIGER_ENDPOINTS[ep];
+    console.log(`[EasyZ] Trying endpoint ${ep + 1}/${TIGER_ENDPOINTS.length}: ${TIGER_BASE.substring(0, 80)}...`);
+    statusText.textContent = `Connecting to Census API (attempt ${ep + 1})...`;
+
+    try {
+      const testFeatures = await fetchStatePlaces(STATES[0].fips, STATES[0].abbr);
+      if (testFeatures.length > 0) {
+        console.log(`[EasyZ] Endpoint ${ep + 1} works! Got ${testFeatures.length} features for ${STATES[0].name}`);
+        loadedFeatures.push(...testFeatures);
+        endpointWorked = true;
+      } else {
+        console.warn(`[EasyZ] Endpoint ${ep + 1} returned 0 features, trying next...`);
+      }
+    } catch (err) {
+      console.warn(`[EasyZ] Endpoint ${ep + 1} failed:`, err.message);
+    }
+  }
+
+  if (!endpointWorked) {
+    statusText.textContent = 'Could not connect to Census boundary API. Please refresh.';
+    throw new Error('All Census API endpoints failed');
+  }
+
+  // Load remaining states in parallel batches of 5 for speed
+  const BATCH_SIZE = 5;
+  let completed = 1;
+  const remaining = STATES.slice(1);
+
+  for (let b = 0; b < remaining.length; b += BATCH_SIZE) {
+    const batch = remaining.slice(b, b + BATCH_SIZE);
+    const batchNames = batch.map(s => s.abbr).join(', ');
+    statusText.textContent = `Loading ${batchNames}... (${completed}/${STATES.length} states)`;
+    progressFill.style.width = `${(completed / STATES.length) * 80}%`;
+
+    const results = await Promise.allSettled(
+      batch.map(state => fetchStatePlaces(state.fips, state.abbr))
+    );
+
+    results.forEach((result, idx) => {
+      if (result.status === 'fulfilled' && result.value.length > 0) {
+        loadedFeatures.push(...result.value);
+        console.log(`[EasyZ] ${batch[idx].name}: ${result.value.length} places`);
+      } else {
+        console.warn(`[EasyZ] Failed: ${batch[idx].name}`, result.reason || 'no data');
+      }
+      completed++;
+    });
+  }
+
+  statusText.textContent = `Loaded ${loadedFeatures.length.toLocaleString()} municipalities across ${STATES.length} states`;
+  progressFill.style.width = '80%';
+  console.log(`[EasyZ] Total: ${loadedFeatures.length} municipalities nationwide`);
+  return loadedFeatures;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderFeatures() {
+  if (geoLayer) map.removeLayer(geoLayer);
+
+  geoLayer = L.geoJSON({ type: 'FeatureCollection', features: allFeatures }, {
+    style: featureStyle,
+    onEachFeature: function(feature, layer) {
+      layer.on({ click: onFeatureClick, mouseover: onFeatureHover, mouseout: onFeatureOut });
+    }
+  });
+
+  geoLayer.addTo(map);
+  updateStats();
+  updateTopList();
+
+  // Reload competitor markers when user pans or zooms (debounced)
+  let competitorDebounce = null;
+  map.on('moveend', function() {
+    if (showCompetitors) {
+      clearTimeout(competitorDebounce);
+      competitorDebounce = setTimeout(function() {
+        if (map.getZoom() < 8) {
+          clearCompetitors();
+          const countEl = document.getElementById('competitor-count');
+          countEl.style.display = 'block';
+          countEl.textContent = 'Zoom in to see competitors (zoom 8+)';
+        } else {
+          loadCompetitors();
+        }
+      }, 400);
+    }
+  });
+}
+
+// ============================================================
+// SIDEBAR CONTROLS
+// ============================================================
+// Competitor label text per use type
+const COMPETITOR_LABELS = {
+  carwash: 'Show existing car washes',
+  drivethru: 'Show existing drive-thrus',
+  collision: 'Show existing collision centers',
+  autosales: 'Show existing dealerships'
+};
+
+// Overpass API queries per use type
+const OVERPASS_QUERIES = {
+  carwash: '[out:json];(node["amenity"="car_wash"]({{bbox}});way["amenity"="car_wash"]({{bbox}}););out center;',
+  drivethru: '[out:json];(node["amenity"="fast_food"]["drive_through"="yes"]({{bbox}});node["amenity"="cafe"]["drive_through"="yes"]({{bbox}});node["cuisine"="coffee"]["drive_through"="yes"]({{bbox}});way["amenity"="fast_food"]["drive_through"="yes"]({{bbox}}););out center;',
+  collision: '[out:json];(node["shop"="car_repair"]({{bbox}});node["craft"="car_body"]({{bbox}});way["shop"="car_repair"]({{bbox}});way["craft"="car_body"]({{bbox}}););out center;',
+  autosales: '[out:json];(node["shop"="car"]({{bbox}});way["shop"="car"]({{bbox}});node["shop"="car_dealer"]({{bbox}});way["shop"="car_dealer"]({{bbox}}););out center;'
+};
+
+// Marker colors per use type
+const COMPETITOR_COLORS = { carwash: '#3b82f6', drivethru: '#f59e0b', collision: '#ef4444', autosales: '#8b5cf6' };
+
+function setLayer(layer) {
+  currentLayer = layer;
+  ['carwash', 'drivethru', 'collision', 'autosales'].forEach(l => {
+    document.getElementById('btn-' + l).classList.toggle('active', l === layer);
+  });
+  const label = LAYER_LABELS[layer] || layer;
+  document.getElementById('stats-title').textContent = `Statistics (${label})`;
+  document.getElementById('top-title').textContent = `Top 10 (${label})`;
+  document.getElementById('competitor-label').textContent = COMPETITOR_LABELS[layer] || 'Show competitors';
+  renderFeatures();
+  if (showCompetitors) loadCompetitors();
+}
+
+function toggleCompetitors() {
+  showCompetitors = !showCompetitors;
+  document.getElementById('toggle-competitors').classList.toggle('active', showCompetitors);
+  if (showCompetitors) {
+    if (map.getZoom() < 8) {
+      const countEl = document.getElementById('competitor-count');
+      countEl.style.display = 'block';
+      countEl.textContent = 'Zoom in to see competitors (zoom 8+)';
+    } else {
+      loadCompetitors();
+    }
+  } else {
+    clearCompetitors();
+  }
+}
+
+function clearCompetitors() {
+  if (competitorLayer) { map.removeLayer(competitorLayer); competitorLayer = null; }
+  document.getElementById('competitor-count').style.display = 'none';
+}
+
+async function loadCompetitors() {
+  if (competitorLoading) return;
+  const bounds = map.getBounds();
+  const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+  const cacheKey = `${currentLayer}_${bbox}`;
+
+  // Check cache
+  if (competitorCache[cacheKey]) {
+    renderCompetitors(competitorCache[cacheKey]);
+    return;
+  }
+
+  competitorLoading = true;
+  const countEl = document.getElementById('competitor-count');
+  countEl.style.display = 'block';
+  countEl.textContent = 'Loading competitors...';
+
+  try {
+    const query = OVERPASS_QUERIES[currentLayer].replace(/\{\{bbox\}\}/g, bbox);
+    const resp = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: 'data=' + encodeURIComponent(query)
+    });
+    const data = await resp.json();
+    const points = data.elements.map(el => {
+      const t = el.tags || {};
+      const addrParts = [t['addr:housenumber'], t['addr:street']].filter(Boolean);
+      const cityState = [t['addr:city'], t['addr:state']].filter(Boolean).join(', ');
+      let address = addrParts.join(' ');
+      if (cityState) address = address ? address + ', ' + cityState : cityState;
+      if (t['addr:postcode']) address = address ? address + ' ' + t['addr:postcode'] : t['addr:postcode'];
+      return {
+        lat: el.lat || (el.center && el.center.lat),
+        lng: el.lon || (el.center && el.center.lon),
+        name: t.name || t.brand || t.operator || 'Unknown',
+        address: address || '',
+        phone: t.phone || t['contact:phone'] || '',
+        website: t.website || t['contact:website'] || '',
+        type: currentLayer
+      };
+    }).filter(p => p.lat && p.lng);
+
+    competitorCache[cacheKey] = points;
+    renderCompetitors(points);
+  } catch (err) {
+    console.error('[EasyZ] Competitor load failed:', err);
+    countEl.textContent = 'Could not load competitor data. Try zooming in.';
+  }
+  competitorLoading = false;
+}
+
+// Drive-thru brand color mapping
+const DRIVETHRU_BRANDS = {
+  'starbucks':   { color: '#22c55e', label: 'Starbucks' },
+  'dutch bros':  { color: '#3b82f6', label: 'Dutch Bros' },
+  'dutch brothers': { color: '#3b82f6', label: 'Dutch Bros' },
+  'dunkin':      { color: '#f97316', label: "Dunkin'" },
+  "dunkin'":     { color: '#f97316', label: "Dunkin'" },
+  "dunkin' donuts": { color: '#f97316', label: "Dunkin'" },
+  'seven brews': { color: '#9f1239', label: 'Seven Brews' },
+  '7 brews':     { color: '#9f1239', label: 'Seven Brews' }
+};
+const DRIVETHRU_OTHER_COLOR = '#94a3b8';
+
+function getCompetitorColor(point) {
+  if (currentLayer !== 'drivethru') return COMPETITOR_COLORS[currentLayer] || '#3b82f6';
+  const nameLower = (point.name || '').toLowerCase();
+  for (const [key, brand] of Object.entries(DRIVETHRU_BRANDS)) {
+    if (nameLower.includes(key)) return brand.color;
+  }
+  return DRIVETHRU_OTHER_COLOR;
+}
+
+function getCompetitorBrand(point) {
+  if (currentLayer !== 'drivethru') return null;
+  const nameLower = (point.name || '').toLowerCase();
+  for (const [key, brand] of Object.entries(DRIVETHRU_BRANDS)) {
+    if (nameLower.includes(key)) return brand.label;
+  }
+  return null;
+}
+
+function renderCompetitors(points) {
+  clearCompetitors();
+  if (!points.length) {
+    document.getElementById('competitor-count').style.display = 'block';
+    document.getElementById('competitor-count').textContent = 'No competitors found in view. Try zooming in.';
+    return;
+  }
+
+  const defaultColor = COMPETITOR_COLORS[currentLayer] || '#3b82f6';
+  const label = LAYER_LABELS[currentLayer] || 'Business';
+
+  // Brand counts for drive-thru legend
+  const brandCounts = {};
+
+  competitorLayer = L.layerGroup();
+  points.forEach(p => {
+    const markerColor = getCompetitorColor(p);
+    const brand = getCompetitorBrand(p);
+    if (brand) brandCounts[brand] = (brandCounts[brand] || 0) + 1;
+    else if (currentLayer === 'drivethru') brandCounts['Other'] = (brandCounts['Other'] || 0) + 1;
+
+    const marker = L.circleMarker([p.lat, p.lng], {
+      radius: 6, fillColor: markerColor, fillOpacity: 0.9, color: '#fff', weight: 1.5, opacity: 0.9,
+      pane: 'competitorPane', bubblingMouseEvents: false
+    });
+
+    // Hover tooltip — name + address
+    const tipLines = [p.name];
+    if (p.address) tipLines.push(p.address);
+    marker.bindTooltip(tipLines.join('<br>'), {
+      direction: 'top', offset: [0, -8], opacity: 0.95,
+      className: 'competitor-tip'
+    });
+
+    // Click popup — full detail card
+    let popupHtml = `<div style="font-size:13px;font-weight:600;margin-bottom:3px;">${p.name}</div>`;
+    if (p.address) popupHtml += `<div style="font-size:11px;color:#ccd;margin-bottom:2px;">${p.address}</div>`;
+    if (p.phone) popupHtml += `<div style="font-size:11px;color:#aab;">Phone: ${p.phone}</div>`;
+    if (p.website) {
+      const shortUrl = p.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+      popupHtml += `<div style="font-size:11px;"><a href="${p.website}" target="_blank" style="color:#4fc3f7;">${shortUrl}</a></div>`;
+    }
+    popupHtml += `<div style="font-size:10px;color:#667;margin-top:4px;">Existing ${label}</div>`;
+    marker.bindPopup(popupHtml);
+
+    competitorLayer.addLayer(marker);
+  });
+  competitorLayer.addTo(map);
+
+  // Build count display
+  const countEl = document.getElementById('competitor-count');
+  countEl.style.display = 'block';
+
+  if (currentLayer === 'drivethru' && Object.keys(brandCounts).length > 0) {
+    // Show brand breakdown for drive-thru
+    const brandOrder = ['Starbucks', 'Dutch Bros', "Dunkin'", 'Seven Brews', 'Other'];
+    const brandColors = { 'Starbucks': '#22c55e', 'Dutch Bros': '#3b82f6', "Dunkin'": '#f97316', 'Seven Brews': '#9f1239', 'Other': DRIVETHRU_OTHER_COLOR };
+    let html = `<div style="margin-bottom:4px;">${points.length} drive-thru${points.length !== 1 ? 's' : ''} in view</div>`;
+    brandOrder.forEach(b => {
+      if (brandCounts[b]) {
+        html += `<div style="font-size:11px;line-height:1.6;"><span style="color:${brandColors[b]};">\u25CF</span> ${b}: ${brandCounts[b]}</div>`;
+      }
+    });
+    countEl.innerHTML = html;
+  } else {
+    countEl.innerHTML = `<span style="color:${defaultColor};">\u25CF</span> ${points.length} existing ${label.toLowerCase()}${points.length !== 1 ? 's' : ''} in view`;
+  }
+}
+
+function updateStats() {
+  let permitted = 0, likely = 0, conditional = 0, restrictive = 0, prohibited = 0, verified = 0;
+
+  for (const f of allFeatures) {
+    const zdAny = getZoningData(f);
+    const score = getLayerScore(zdAny);
+    if (score === null) continue;
+    if (score >= 80) permitted++;
+    else if (score >= 65) likely++;
+    else if (score >= 50) conditional++;
+    else if (score >= 30) restrictive++;
+    else prohibited++;
+    // Count verified (researched, non-estimated)
+    const key = f.properties._zoningKey;
+    if (ZONING_DATA[key] && ZONING_DATA[key].confidence !== 'AI Estimate') verified++;
+  }
+
+  document.getElementById('stat-permitted').textContent = permitted;
+  document.getElementById('stat-likely').textContent = likely;
+  document.getElementById('stat-conditional').textContent = conditional;
+  document.getElementById('stat-restrictive').textContent = restrictive;
+  document.getElementById('stat-prohibited').textContent = prohibited;
+  document.getElementById('stat-unresearched').textContent = allFeatures.length - verified + ' est';
+
+  const total = allFeatures.length;
+  document.getElementById('stat-bar-fill').style.width = total > 0 ? `${(verified / total) * 100}%` : '0%';
+}
+
+function updateTopList() {
+  const scored = [];
+  for (const [key, zd] of Object.entries(ZONING_DATA)) {
+    const score = zd[currentLayer] ? zd[currentLayer].score : (zd.composite || 0);
+    scored.push({ key, name: zd.name, state: zd.state, score, stacking: zd.stacking_issue, confidence: zd.confidence || 'Unknown' });
+  }
+  scored.sort((a, b) => b.score - a.score);
+
+  const top10 = scored.slice(0, 10);
+  const list = document.getElementById('top-list');
+  list.innerHTML = top10.map((m, i) => {
+    const color = scoreToColor(m.score);
+    const confIcon = m.confidence === 'AI Estimate' ? ' <span style="color:#f97316;font-size:10px;">est</span>' : '';
+    return `<li class="top-item">
+      <span class="top-rank">${i + 1}</span>
+      <span>${m.name}, ${m.state}${m.stacking ? ' &#9888;' : ''}${confIcon}</span>
+      <span class="top-score" style="color:${color}">${m.score}</span>
+    </li>`;
+  }).join('');
+}
+
+function handleSearch(query) {
+  const results = document.getElementById('search-results');
+  if (!query || query.length < 2) { results.innerHTML = ''; return; }
+
+  const q = query.toLowerCase();
+  const matches = allFeatures
+    .filter(f => {
+      const name = (f.properties.NAME || '').toLowerCase();
+      const zoningKey = (f.properties._zoningKey || '').toLowerCase();
+      return name.includes(q) || zoningKey.includes(q);
+    })
+    .slice(0, 15)
+    .map((f, idx) => {
+      const name = f.properties.NAME || 'Unknown';
+      const state = STATE_ABBR[f.properties.STATEFP || f.properties.STATE] || '';
+      const zoningKey = f.properties._zoningKey || '';
+      const zdAny = getZoningData(f);
+      const score = getLayerScore(zdAny);
+      const color = scoreToColor(score);
+      const label = score !== null ? score : '?';
+      const isResearched = !!ZONING_DATA[zoningKey];
+      const conf = !isResearched ? ' est' : (zdAny.confidence === 'AI Estimate' ? ' est' : '');
+      return { name, state, score, color, label, zoningKey, idx, conf };
+    });
+
+  // Use feature index for reliable lookup
+  results.innerHTML = matches.map(m =>
+    `<div class="search-result" onclick="zoomToFeature('${m.zoningKey.replace(/'/g, "\\'")}')">
+      <span>${m.name}, ${m.state}</span>
+      <span class="score-badge" style="background:${m.color};color:#000;">${m.label}<span style="font-size:9px;opacity:0.7;">${m.conf}</span></span>
+    </div>`
+  ).join('');
+}
+
+function zoomToFeature(zoningKey) {
+  // Find feature by zoning key
+  const feature = allFeatures.find(f => f.properties._zoningKey === zoningKey);
+  if (feature && feature.geometry) {
+    const tempLayer = L.geoJSON(feature);
+    const bounds = tempLayer.getBounds();
+    map.fitBounds(bounds, { maxZoom: 14, padding: [40, 40] });
+
+    // Trigger the click popup after zoom animation
+    const center = bounds.getCenter();
+    setTimeout(() => {
+      geoLayer.eachLayer(l => {
+        if (l.feature && l.feature.properties._zoningKey === zoningKey) {
+          l.setStyle({ weight: 3, color: '#e94560', fillOpacity: 0.75 });
+          l.bringToFront();
+          l.fire('click', { latlng: center });
+        }
+      });
+    }, 600);
+  } else {
+    console.warn('[EasyZ] Could not find feature for:', zoningKey);
+  }
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-input').value = '';
+}
+
+// ============================================================
+// ADDRESS GEOCODING (Nominatim)
+// ============================================================
+let addressDebounce = null;
+let addressMarker = null;
+
+function handleAddressSearch(query) {
+  clearTimeout(addressDebounce);
+  const results = document.getElementById('address-results');
+  if (!query || query.length < 3) { results.innerHTML = ''; return; }
+
+  addressDebounce = setTimeout(async () => {
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=5&q=${encodeURIComponent(query)}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await resp.json();
+      results.innerHTML = data.map((r, i) =>
+        `<div class="addr-result" onclick="flyToAddress(${r.lat}, ${r.lon}, '${r.display_name.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">${r.display_name}</div>`
+      ).join('');
+    } catch (err) {
+      results.innerHTML = '<div class="addr-result" style="color:#f66;">Search failed. Try again.</div>';
+    }
+  }, 400);
+}
+
+function flyToAddress(lat, lon, label) {
+  // Clear previous address marker
+  if (addressMarker) { map.removeLayer(addressMarker); addressMarker = null; }
+
+  map.flyTo([lat, lon], 14, { duration: 1.2 });
+
+  // Drop a pin
+  addressMarker = L.marker([lat, lon], {
+    icon: L.divIcon({
+      className: 'address-pin',
+      html: '<div style="width:12px;height:12px;background:#e94560;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5);"></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    }),
+    pane: 'competitorPane'
+  }).addTo(map);
+  addressMarker.bindTooltip(label, { direction: 'top', offset: [0, -10], className: 'competitor-tip', permanent: false });
+  addressMarker.bindPopup(`<div style="font-size:13px;font-weight:600;margin-bottom:3px;">Address Pin</div><div style="font-size:11px;color:#ccd;">${label}</div><div style="margin-top:6px;"><a href="#" onclick="if(addressMarker){map.removeLayer(addressMarker);addressMarker=null;}return false;" style="color:#e94560;font-size:11px;">Remove pin</a></div>`);
+
+  // Clear search
+  document.getElementById('address-results').innerHTML = '';
+  document.getElementById('address-input').value = '';
+}
+
+// ============================================================
+// MAIN
+// ============================================================
+async function main() {
+  initMap();
+
+  try {
+    allFeatures = await loadAllBoundaries();
+
+    const progressFill = document.getElementById('progress-fill');
+    const statusText = document.getElementById('loading-status');
+    progressFill.style.width = '90%';
+    statusText.textContent = `Rendering ${allFeatures.length} municipalities...`;
+
+    // Log matching stats
+    let matched = 0;
+    for (const f of allFeatures) {
+      if (ZONING_DATA[f.properties._zoningKey]) matched++;
+    }
+    console.log(`[EasyZ] ${matched} verified + ${allFeatures.length - matched} auto-estimated = ${allFeatures.length} total municipalities`);
+
+    // Small delay to allow UI update
+    await new Promise(r => setTimeout(r, 100));
+
+    renderFeatures();
+
+    progressFill.style.width = '100%';
+    statusText.textContent = 'Done!';
+
+    setTimeout(() => {
+      document.getElementById('loading').classList.add('hidden');
+    }, 500);
+
+  } catch (err) {
+    console.error('[EasyZ] Failed to load boundary data:', err);
+    const statusEl = document.getElementById('loading-status');
+    statusEl.textContent = 'Could not load boundary data. Check your internet and try refreshing.';
+    statusEl.style.color = '#ef4444';
+    // Show error details
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'margin-top:12px;font-size:12px;color:#aaa;max-width:400px;word-wrap:break-word;';
+    errorDiv.textContent = `Error: ${err.message}. Open browser console (F12) for details.`;
+    statusEl.parentNode.appendChild(errorDiv);
+  }
+}
+
+main();
+</script>
+</body>
+</html>

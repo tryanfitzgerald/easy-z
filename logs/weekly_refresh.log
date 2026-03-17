@@ -1,0 +1,115 @@
+[2026-03-15T19:46:57.580623] ============================================================
+[2026-03-15T19:46:57.581416] WEEKLY REFRESH STARTED
+[2026-03-15T19:46:57.581965] ============================================================
+[2026-03-15T19:46:57.583581] Current data: 88 municipalities, 0 tracked hashes
+[2026-03-15T19:46:57.584000] --- Checking Municode for ordinance changes ---
+[2026-03-15T19:46:57.602135] Could not check Chicago, IL: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.603397] Could not check Aurora, IL: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.604461] Could not check Naperville, IL: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.605637] Could not check Evanston, IL: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.606920] Could not check Milwaukee, WI: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.607965] Could not check Madison, WI: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.608820] Could not check Indianapolis, IN: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.609730] Could not check Fort Wayne, IN: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.610550] Could not check Green Bay, WI: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.611312] Could not check South Bend, IN: <urlopen error Tunnel connection failed: 403 Forbidden>
+[2026-03-15T19:46:57.612142] --- Searching for recent approval/denial news ---
+[2026-03-15T19:46:57.612412] News search for 2026 — checking for approval/denial updates
+[2026-03-15T19:46:57.613147]   Would search: "Aurora" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.613398]   Would search: "Joliet" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.613680]   Would search: "Des Plaines" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.613978]   Would search: "Wauwatosa" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.614272]   Would search: "Oak Creek" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.614570]   Would search: "Sun Prairie" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.614828]   Would search: "Plainfield" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.615067]   Would search: "Bolingbrook" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.615303]   Would search: "Romeoville" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.615617]   Would search: "Addison" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.615864]   Would search: "Carol Stream" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.616097]   Would search: "Glendale Heights" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.616329]   Would search: "Bloomingdale" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.616579]   Would search: "Bensenville" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.616861]   Would search: "Wood Dale" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.617116]   Would search: "Itasca" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.617397]   Would search: "Elk Grove Village" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.617671]   Would search: "Waukegan" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.617916]   Would search: "Antioch" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.618161]   Would search: "Round Lake" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.618444]   Would search: "Mundelein" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.618768]   Would search: "Grayslake" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.619043]   Would search: "Tinley Park" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.619294]   Would search: "Homer Glen" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.619568]   Would search: "Blue Island" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.619828]   Would search: "Alsip" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.620084]   Would search: "Oak Forest" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.620367]   Would search: "Berwyn" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.620643]   Would search: "Cicero" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.620905]   Would search: "Melrose Park" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.621153]   Would search: "Bellwood" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.621415]   Would search: "Green Bay" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.621919]   Would search: "Warrenville" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.622251]   Would search: "Winfield" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.622604]   Would search: "Villa Park" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.622972]   Would search: "Menomonee Falls" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.623420]   Would search: "Germantown" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.623781]   Would search: "West Bend" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.624099]   Would search: "De Pere" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.624385]   Would search: "Ashwaubenon" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.624686]   Would search: "Grafton" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.624956]   Would search: "Port Washington" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.625225]   Would search: "Lockport" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.625524]   Would search: "Fitchburg" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.625800]   Would search: "Middleton" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.626054]   Would search: "Glendale" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.626310]   Would search: "Madison" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.626596]   Would search: "Waukesha" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.626873]   Would search: "Verona" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.627132]   Would search: "Chicago" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.627400]   Would search: "Milwaukee" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.627681]   Would search: "Wheaton" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.627928]   Would search: "Skokie" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.628184]   Would search: "Arlington Heights" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.628466]   Would search: "Downers Grove" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.628704]   Would search: "New Berlin" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.628952]   Would search: "Palatine" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.629229]   Would search: "Rolling Meadows" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.629562]   Would search: "Mount Prospect" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.629841]   Would search: "Hoffman Estates" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.630103]   Would search: "Northbrook" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.630393]   Would search: "Glenview" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.630669]   Would search: "Elmhurst" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.630935]   Would search: "Lombard" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.631189]   Would search: "Orland Park" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.631456]   Would search: "Evanston" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.631710]   Would search: "Oak Park" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.631968]   Would search: "Mequon" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.632237]   Would search: "Shorewood" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.632510]   Would search: "Park Ridge" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.632776]   Would search: "Wilmette" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.633026]   Would search: "Highland Park" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.633279]   Would search: "Deerfield" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.633548]   Would search: "Lake Forest" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.633800]   Would search: "Libertyville" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.634085]   Would search: "Palos Hills" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.634389]   Would search: "Darien" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.634696]   Would search: "Hinsdale" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.634989]   Would search: "Westmont" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.635276]   Would search: "Cedarburg" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.635584]   Would search: "Brookfield" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.635837]   Would search: "Naperville" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.636102]   Would search: "Schaumburg" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.636363]   Would search: "Barrington" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.636628]   Would search: "Glencoe" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.636908]   Would search: "Winnetka" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.637155]   Would search: "Clarendon Hills" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.637409]   Would search: "Kenilworth" carwash OR "car wash" approval OR denied OR permit 2026
+[2026-03-15T19:46:57.637715] News search complete. Found updates for 0 cities.
+[2026-03-15T19:46:57.638052] --- Rebuilding HTML map ---
+[2026-03-15T19:46:57.650497] HTML map rebuilt successfully
+[2026-03-15T19:46:57.650760] HTML map built: /sessions/focused-dreamy-albattani/mnt/Easy Z/municipal_zoning_heatmap.html
+  Zoning data: 88 municipalities (17848 bytes)
+  HTML size: 42077 bytes (41 KB)
+[2026-03-15T19:46:57.651616] Report saved: /sessions/focused-dreamy-albattani/mnt/Easy Z/logs/refresh_report_2026-03-15.txt
+[2026-03-15T19:46:57.651918] ============================================================
+[2026-03-15T19:46:57.652254] WEEKLY REFRESH COMPLETE
+[2026-03-15T19:46:57.652568] ============================================================

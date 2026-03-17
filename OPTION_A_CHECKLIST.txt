@@ -1,0 +1,190 @@
+═══════════════════════════════════════════════════════════════════════════════
+  OPTION A: URL RESEARCH CHECKLIST
+  Track your progress as you research 30 cities
+═══════════════════════════════════════════════════════════════════════════════
+
+GOAL: Find zoning ordinance URLs for 30 cities in 15 minutes
+
+CITY RESEARCH TRACKING
+
+ILLINOIS CITIES (15)
+─────────────────────────────────────────────────────────────────────────────
+
+☐ 1.  Chicago
+      URL: _________________________________________________
+      
+☐ 2.  Evanston
+      URL: _________________________________________________
+      
+☐ 3.  Oak Park
+      URL: _________________________________________________
+      
+☐ 4.  Skokie
+      URL: _________________________________________________
+      
+☐ 5.  Des Plaines
+      URL: _________________________________________________
+      
+☐ 6.  Downers Grove
+      URL: _________________________________________________
+      
+☐ 7.  Naperville
+      URL: _________________________________________________
+      
+☐ 8.  Aurora
+      URL: _________________________________________________
+      
+☐ 9.  Schaumburg
+      URL: _________________________________________________
+      
+☐ 10. Arlington Heights
+      URL: _________________________________________________
+      
+☐ 11. Palatine
+      URL: _________________________________________________
+      
+☐ 12. Park Ridge
+      URL: _________________________________________________
+      
+☐ 13. Cicero
+      URL: _________________________________________________
+      
+☐ 14. Oak Lawn
+      URL: _________________________________________________
+      
+☐ 15. Berwyn
+      URL: _________________________________________________
+
+WISCONSIN CITIES (15)
+─────────────────────────────────────────────────────────────────────────────
+
+☐ 16. Madison
+      URL: _________________________________________________
+      
+☐ 17. Milwaukee
+      URL: _________________________________________________
+      
+☐ 18. Brookfield
+      URL: _________________________________________________
+      
+☐ 19. Waukesha
+      URL: _________________________________________________
+      
+☐ 20. Green Bay
+      URL: _________________________________________________
+      
+☐ 21. Fitchburg
+      URL: _________________________________________________
+      
+☐ 22. Verona
+      URL: _________________________________________________
+      
+☐ 23. Sun Prairie
+      URL: _________________________________________________
+      
+☐ 24. Wauwatosa
+      URL: _________________________________________________
+      
+☐ 25. Shorewood
+      URL: _________________________________________________
+      
+☐ 26. Oak Creek
+      URL: _________________________________________________
+      
+☐ 27. Middleton
+      URL: _________________________________________________
+      
+☐ 28. Dane
+      URL: _________________________________________________
+      
+☐ 29. Mequon
+      URL: _________________________________________________
+      
+☐ 30. Glendale
+      URL: _________________________________________________
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RESEARCH TIPS REMINDER
+
+For each city:
+  1. Google: "[city name] zoning ordinance"
+  2. Look for PDF or zoning page
+  3. Copy URL
+  4. Write it down above
+  5. Move to next city
+
+Time per city: ~30 seconds
+Total time: ~15 minutes for all 30
+
+═══════════════════════════════════════════════════════════════════════════════
+
+AFTER RESEARCH: UPDATE THE SCRIPT
+
+Once you have all 30 URLs:
+
+1. Open: scripts/01_fetch_ordinances.py
+2. Find: def get_municipality_base_urls(self)
+3. Replace: base_urls dictionary with your 30 cities
+4. Save file
+5. Tell me you're done
+
+Example format:
+  "Chicago": "https://www.chicago.gov/zoning-ordinance",
+  "Madison": "https://www.cityofmadison.com/planning/zoning-code",
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PROGRESS TRACKING
+
+Research Progress:
+  ☐ Start researching
+  ☐ First 10 cities done
+  ☐ All 15 Illinois cities done
+  ☐ All 15 Wisconsin cities done (30/30)
+  
+Script Update:
+  ☐ Open script file
+  ☐ Find base_urls dictionary
+  ☐ Add all 30 URLs
+  ☐ Save and verify
+
+Ready to Launch:
+  ☐ All URLs researched
+  ☐ Script updated
+  ☐ Tell Claude ready to execute
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TROUBLESHOOTING QUICK ANSWERS
+
+Q: Can't find URL for a city?
+A: That's OK. Try the fallback searches mentioned in the guide. Or skip it - the 
+   system will try to find it through other strategies.
+
+Q: Found multiple URLs for one city?
+A: Pick the most recent one (usually marked "current"). Direct PDFs are best.
+
+Q: Is Municode URL OK?
+A: Yes! Municode URLs work great.
+
+Q: How do I know URL is correct?
+A: If it contains "zoning", "ordinance", or "code" and is from the city website, 
+   you're good.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ESTIMATED TIME: 15 MINUTES
+
+Start: _______________
+Finish: _______________
+
+Total time taken: _________ minutes
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Ready to research? Open Google and start with #1: Chicago
+
+Good luck! Should be quick and easy.
+
+═══════════════════════════════════════════════════════════════════════════════

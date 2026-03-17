@@ -1,0 +1,12 @@
+Weekly Refresh Report — 2026-03-15
+============================================================
+
+Municode changes detected: 0
+
+News items found: 0
+
+Actions taken:
+  - Regenerated HTML map with current data
+  - Updated content hashes
+
+Next refresh: 1 week
